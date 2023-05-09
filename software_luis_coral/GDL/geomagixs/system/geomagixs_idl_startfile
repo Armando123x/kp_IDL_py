@@ -1,0 +1,13 @@
+; All integers at main level are LONG and enforce square bracket array subscripting.
+   COMPILE_OPT idl2, HIDDEN
+
+; TRUE_COLOR visual class and maintain backing store for me.
+   device, true_color = 24
+   device, decomposed = 0
+   device, retain = 2
+
+;A long-integer variable indicating whether informational messages should be printed (0) or suppressed (nonzero). By default, !QUIET is set to zero.
+  !QUIET=1
+
+
+

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Ejemplo de script que recibe parametros y los imprime
+
+#GEOMAGIXS_LIB_DIR_OLD=$GEOMAGIXS_LIB_DIR
+GEOMAGIXS_LIB_DIR=$HOME/GDL/geomagixs
+
+sh $GEOMAGIXS_LIB_DIR/geomagixs.sh planetary -real_time
+

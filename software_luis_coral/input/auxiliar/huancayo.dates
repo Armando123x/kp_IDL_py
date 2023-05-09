@@ -1,0 +1,5 @@
+# File with available date range for the GMS: 1st and 2nd rows are related with the early and final k-index files, respectively; and the 3rd row with the magnetic data files.
+# the format is initial-final date [YYYYMMDD]
+20230101-20230315
+   00000-   00000
+20221201-20230315

@@ -1,0 +1,39 @@
+                FOR i=0, number_of_lines-1 DO BEGIN
+                        format_for_reading = '(I4,X,I2,X,I2,X,I2,X,I2,2x,F9,X,F9,X,F9,X,F8,X,F8)'
+                        
+                        IF STRLEN(file_data[i]) GE 64 THEN BEGIN
+                                READS, file_data[i], data[i], FORMAT=format_for_reading
+                        ENDIF ELSE
+                                tmp_date = [0,0,0,0,0]
+                                READS,file_data[i], tmp_date, FORMAT = '(I4,X,I2,X,I2,X,I2,X,I2:)'
+                                data[i].year   = tmp_date[0]
+                                data[i].month  = tmp_date[1]
+                                data[i].day    = tmp_date[2]
+                                data[i].hour   = tmp_date[3]
+                                data[i].minute = tmp_date[4]
+                                
+                                str_pos = 18
+                                str_tmp = STRMID(file_data[i], str_pos-1)
+                                data_string = ''
+ 
+                                blank_pos = STRPOS(str_tmp, ' ')
+                                data[i].H = FLOAT(STRMID(str_tmp, 0, blank_pos))
+                                
+                                str_tmp = STRMID(str_tmp, blank_pos+1)
+                                blank_pos = STRPOS(str_tmp, ' ')
+                                data[i].D = FLOAT(STRMID(str_tmp, 0, blank_pos))
+                               
+                                str_tmp = STRMID(str_tmp, blank_pos+1)
+                                blank_pos = STRPOS(str_tmp, ' ')
+                                data[i].Z = FLOAT(STRMID(str_tmp, 0, blank_pos))
+                                        
+                                str_tmp = STRMID(str_tmp, blank_pos+1)
+                                blank_pos = STRPOS(str_tmp, ' ')
+                                data[i].Tc = FLOAT(STRMID(str_tmp, 0, blank_pos))
+
+                                str_tmp = STRMID(str_tmp, blank_pos+1)
+                                data[i].Ts = FLOAT(str_tmp)
+                        ENDELSE
+                        
+                ENDFOR
+
