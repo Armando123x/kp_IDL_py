@@ -17,7 +17,7 @@ import os
 import subprocess
 
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime,timedelta
 
 import urllib.request
 import re
@@ -25,6 +25,7 @@ from glob import glob
 
 from utils import *
 
+from dateutil.relativedelta import relativedelta
 #######################################################################333
 ##### Parametro quiet en IDL  es practicamente verbose en Python
 #####
@@ -343,22 +344,116 @@ class geomagixs (object):
             initial_month = date.month
             initial_day = date.day
             
-            file_name = "kp{:2d}{:2d}.wdc".format(initial_year %1000,initial_month)
+            file_name = "kp{:02d}{:02d}.wdc".format(initial_year %1000,initial_month)
             
             fpath = os.path.join(self.system['datasource_dir'],self.GMS[self.system['gms']]['name'])
             
-            file = file_search(filename=file_name,directory=fpath)
+            file_path = os.path.join(fpath,file_name)
             
-            if file:
+            
+            file = os.path.exists(file_path)
+            
+            if not file:
                 if verbose:
-                    print("Input Warning: Existe conflicto con el valor de fecha(s). Archivo\
-                          perdido {}.".format(file_name))
+                    ResourceWarning("Input Warning: Existe conflicto con el valor de fecha(s). Archivo\
+                          perdido {}. Se reeemplazará los valores perdidos con datos nulos.".format(file_name))
+                
+                number_lines = JULDAY(datetime(initial_year,initial_month+1,1))
+                
+                magnetic_data = numpy.array(['{:02d}{:02d}{:02d}'.format(initial_year%1000,initial_month,x) for x in range(number_lines)],dtype='object')
+     
+            else:
+                with open(file_name,'r') as archivo:
                     
+                    buff_lines = archivo.readlines()
+                    
+                    magnetic_data = numpy.array(buff_lines,dtype='object')
+                
+            kp_data = numpy.empty(9)
+            kp_data.fill(9999)
             
-            with open(file_name,'r') as archivo:
+            ap_data = numpy.empty(9)
+            ap_data.fill(9999)
+            
+            line = '{:02d}{:02d}{:02d}'.format(initial_year%1000,
+                                               initial_month,
+                                               initial_day)
+            ind=0
+            for n,value in enumerate(magnetic_data):
+                if value.lower()[:6]==line.lower[:6]:
+                    if n>0:
+                        if len(value)>=62:
+                            #falta encontrar linea de caracteres
+                            # linea 348
+                            pass
+                        else:
+                            tmp_kp = numpy.empty(8)
+                            #falta rutina
+                            #linea 351
+                            
+                        ind = numpy.where(kp_data[:7]>90)[0]
+                        
+                        if ind[0]>0:
+                            kp_data[ind]=999
+                            ap_data[ind]=999
+                            
+                            if len(ind)==8:
+                                kp_data[8]=999
+                                ap_data[8]=999
+            
+            #for dst
+            file_name = 'dst{:02d}{:02d}.dat'.format(initial_year%1000,initial_month)
+            file_name = os.path.join(self.system['datasource_dir'],self.GMS[self.system['gms']]['name'],file_name)
+            
+            check = os.path.isfile(file_name)
+            
+            if not check:
+                if verbose:
+                    ResourceWarning('Conflicto con la entrada de datos. Archivo perdido {}, se\
+                                     reemplazará con datos vacios.'.format(os.path.basename(file_name)))
+                    
+            else:
+                #archivo existe 
                 
-                buff_lines = archivo.readlines()
-                
+                with (file_name,'r') as f:
+                    
+                    buff = f.readlines()
+                    
+                    if len(buff)>0:
+                        
+                        magnetic_data = numpy.array(buff,dtype='object')
+                        
+                        number_lines= JULDAY(datetime(initial_year,initial_month,1)+relativedelta(months=1))-\
+                                       JULDAY(datetime(initial_year,initial_month,1))
+                    else:
+                        
+                        if verbose:
+                            ResourceWarning("Inconsistencia en los datos del archivo {},los datos están corruptos\
+                                            . Se reemplazará los datos con datos aleatorios.".format(os.path.basename(file_name))) 
+                            
+                        number_lines = JULDAY(datetime(initial_year,initial_month,1)+relativedelta(months=1)) - \
+                                       JULDAY(datetime(initial_year,initial_month,1))      
+                                       
+                        magnetic_data = numpy.empty(number_lines, dtype='object')
+                        
+                        for n in range(number_lines):
+                            
+                            
+                            string = 'DST {:02d}{:02d}*{:02d}RRX020   09999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999'.format(initial_year%1000,
+                                                                                                                                                                                    initial_month,n+1)
+                            magnetic_data[n]= string
+            
+            
+            dst_data = numpy.empty(25,dtype=int) + 9999 
+            
+            line ='DST {:02d}{:02d}*{:02d}'.format(initial_year % 1000,initial_month,initial_day)
+            
+            
+            for n,value in enumerate(magnetic_data):
+                if value[:10].lower()==line[:10].lower():
+                    magnetic_data[n]=
+
+                            
             
             
             
@@ -368,7 +463,7 @@ class geomagixs (object):
         except:
             print("Ocurrio un error en {}".format("__make_planetarymagneticdatafiles"))
     
-    def __making_magneticdatafile (date, station=None,verbose=False,force_all=False):
+    def __making_magneticdatafile (self,date, station=None,verbose=False,force_all=False):
         
         #script -> geomagixs_magneticdata_download.pro
         #completado pero revisar lógica
