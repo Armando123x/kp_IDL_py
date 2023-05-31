@@ -444,24 +444,109 @@ class geomagixs (object):
                             magnetic_data[n]= string
             
             
-            dst_data = numpy.empty(25,dtype=int) + 9999 
+            dst_data = numpy.empty(25,dtype=int) 
+            
+            dst_data.fill(9999)
             
             line ='DST {:02d}{:02d}*{:02d}'.format(initial_year % 1000,initial_month,initial_day)
             
             
             for n,value in enumerate(magnetic_data):
                 if value[:10].lower()==line[:10].lower():
-                    magnetic_data[n]=
+                    # falta colocar el formato linea 424
+                    # magnetic_data[n]=
+                    pass
+            
+            cabera = 18
 
-                            
+            file_data = numpy.empty(24+cabera,dtype='object')
+
+            file_data[0] = ' FORMAT                 IAGA-2002x (Extended IAGA2002 Format)                         |'
+            file_data[1] = ' Source of Data         Kp/Ap: GFZ Helmholtz Centre & Dst: WDC for Geomagnetism       |'
+
+            chain = ' '*(62-len(self.GMS[self.system['gms']]['name']))
+
+            file_data [2]         = ' Station Name           {}{}|'.format(self.GMS[self.system['gms']]['name'].upper(),chain)
+            file_data [3]         = ' IAGA CODE              {}                                                           |'.format(self.GMS[self.system['gms']]['code'])
+            file_data [4]         = ' Geodetic Latitude      {:8.3f}                                                      |'.format(self.GMS[self.system['gms']]['latitude'])
+            file_data [5]         = ' Geodetic Longitude      {:8.3f}                                                      |'.format(self.GMS[self.system['gms']]['longitude'])
+            file_data [6]         = ' Elevation              {:6.1f}                                                        |'.format(self.GMS[self.system['gms']]['elevation'])
+            file_data [7]         = ' Reported               [Kp][Sum(Kp)_24h][Ap][<Ap>_24h][Dst][<Dst>_24h]               |'
+            file_data[8]          =' Sensor Orientation     variation: N/A                                                |'
+            file_data[9]          =' Digital Sampling       3 hours/3 hours/1 hour                                        |'
+            file_data[10]         =' Data Interval Type     Filtered hours [X=0,2] (00:00 - 0X:59)                        |'
+            file_data[11]         =' Data Type              Reported                                                      |'
+            file_data[12]         =' # Element              Planetary Indexes of Geomagnetic Activity                     |'
+            file_data[13]         =' # Unit                 Kp [N/A] Ap [nT] Dst [nT]                                     |'
+            file_data[14]         =' # Issued by            Instituto de Geofísica, UNAM, MEXICO                          |'
+            file_data[15]         =' # URL                  http://www.sciesmex.unam.mx                                   |'
+            file_data[16]         =' # Last Modified        Mar 25 2021                                                   |'
+        
+            file_data[17]         ='DATE       TIME         DOY     Kp    S(Kp)     Ap     <Ap>     Dst     <Dst>         |'
             
+
+            tmp_doy   = JULDAY(datetime(initial_year,initial_month,initial_day))-JULDAY(datetime(initial_year,1,1))
+
+
+            for i in range(18,42):
+
+                cadena = '{:04d}-{:02d}-{:02d} {:02d}:{:02d}:00.000 {:03d}   {:4d}     {:4d}  {:5d}    {:5d}   {:5d}     {:5d}'
+
+                cadena = cadena.format(initial_year,initial_month,initial_day,(i-18),0,tmp_doy,\
+                                       kp_data[int((i-18)/3)],kp_data[8],ap_data[int((i-18)/3)],ap_data[8],dst_data[i-18],dst_data[24])
+                
+                file_data[i] = cadena
+
             
+            data_file_name = '{}{:04d}{:02d}{:02d}.rK.min'.format(self.GMS[self.system['gms']]['code'],initial_year,initial_month,initial_day)
+
+            data_file_name = os.path.join(self.system['datasource_dir'],self.GMS[self.system['gms']]['name'],data_file_name)
+
+
+            if not os.path.isfile(data_file_name):
+                
+                if not os.access(data_file_name,os.W_OK):
+                    PermissionError("No se puede escribir en la ruta {}.".format(data_file_name))
+
+                with open(data_file_name,'wb') as f:
+                    for data in file_data:
+                        f.write(data)
+
+                    if verbose:
+                        print('Guardando:',data_file_name)
+            
+
+
             
 
 
         
         except:
             print("Ocurrio un error en {}".format("__make_planetarymagneticdatafiles"))
+    
+    
+    
+    def __magneticdata_download(self,date_ini= None,date_fin = None,verbose):
+
+        try:
+            update_flag = False
+
+            if date_ini is None:
+                initial = datetime.now()
+            if date_fin is None:
+                final =  initial
+
+
+
+        except:
+
+    
+    
+    
+    
+    
+    
+    
     
     def __making_magneticdatafile (self,date, station=None,verbose=False,force_all=False):
         
@@ -593,7 +678,6 @@ class geomagixs (object):
             # Rellenando datos
             ######################
             
-            for 
             
             str_tmp1    =   ' '*(62-len(self.GMS[self.system['gms']]['name']))
             
@@ -651,8 +735,8 @@ class geomagixs (object):
                     
                     
             with open(fpath,'w') as archivo:
-                for line in file_data:
-                    archivo.write(line+"\n")
+             
+                archivo.writelines(file_data)
                         
 
         
@@ -1312,7 +1396,7 @@ class geomagixs (object):
                                                 'elevation'   : 0.,
                                                 'calibration' : numpy.zeros(28,dtype=numpy.float64),
                                                 'data_index'  :  numpy.zeros((4,3)),
-                                                'dates_data'  : numpy.zeros((2,3)),
+                                                'dates_data'  : numpy.zeros((2,3)), #[datetime initial, datetime final]
                                                 'base_line'   : numpy.zeros(3),   # [D,H,Z]
                                                 'check_flag'  : 0 
                                     }
