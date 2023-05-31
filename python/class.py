@@ -526,7 +526,7 @@ class geomagixs (object):
     
     
     
-    def __magneticdata_download(self,date_ini= None,date_fin = None,verbose):
+    def __magneticdata_download(self,date_ini= None,date_fin = None,verbose=False):
 
         try:
             update_flag = False
@@ -535,6 +535,83 @@ class geomagixs (object):
                 initial = datetime.now()
             if date_fin is None:
                 final =  initial
+
+            check_dates(date_ini,date_fin,GMS=self.GMS,system=self.system)
+
+            final_date = final 
+            initial_date = date_ini
+
+            #remember that dates belong to datetime object
+            # data format [YYYY, MM, DD] 
+            if self.GMS[self.system['gms']]['name'] == 'planetary':
+                 
+                 diff_year = final_date.year - initial_date.year
+                 diff_month = final_date.month - initial_date.month
+
+                 files_number= diff_year*12 + diff_month + 1
+            else:
+
+                files_number = JULDAY(final_date) - JULDAY(initial_date)
+
+            if verbose:
+                if update_flag is False:
+                    print("Un total de {} días de archivos van a ser reescritos. Los datos serán PERMANENTEMENTE borrados.".format(files_number)) 
+
+                else:
+                    print("Un total de {} archivos van a ser actualizados".format(files_number))           
+
+            files_source_name_k      = numpy.empty(files_number,dtype='object')
+            files_source_name_r      = numpy.empty(files_number,dtype='object')
+            directories_source_name  = numpy.empty(files_number,dtype='object')
+            files_destiny_name       = numpy.empty(files_number,dtype='object')
+            directories_destiny_name = numpy.empty(files_number,dtype='object')
+            terminal_results_k       = numpy.empty(files_number,dtype='object')
+            terminal_errors_k        = numpy.empty(files_number,dtype='object')
+            terminal_results_r       = numpy.empty(files_number,dtype='object')
+            terminal_errors_r        = numpy.empty(files_number,dtype='object')      
+
+
+            if self.GMS[self.system['gms']]['name'] == 'teoloyucan':
+
+                for i in range(files_number):
+
+                    tmp = CALDAT(JULDAY(initial_date))
+
+                    tmp_y = tmp.year
+                    tmp_m = tmp.month
+                    tmp_d = tmp.day
+
+                    files_source_name_k[i] = self.GMS[self.system['gms']]['code'] + '{:4d}{:02d}{:02d}.rK.min'.format(tmp_y,tmp_m,tmp_d)
+                    files_source_name_r[i] = self.GMS[self.system['gms']]['code'] + '{:4d}{:02d}{:02d}.rmin.min'.format(tmp_y,tmp_m,tmp_d)
+                    
+                    directories_source_name[i] = self.system['ssh_user']+'@'+self.system['ssh_address']+self.GMS[self.system['gms']]['code']+'/{:04d}/'.format(tmp_y)
+
+                    directories_destiny_name[i] = self.system['datasource_dir']+self.GMS[self.system['gms']]+'/'
+ 
+                    
+                    if verbose:
+                        print('Copiando {:04d}{:02d}{:02d} archivos.'.format(tmp_y,tmp_m,tmp_d))
+
+                    ##### first sshpass
+                    login = '{} scp {} {}'.format(self.system['ssh_password'],directories_source_name[i]+files_source_name_k[i],
+                                                  directories_destiny_name[i]+files_source_name_k[i])
+                    command = 'sshpass -p {}'.format(login)
+                    result = execute_command(command)
+
+                    tmp_results=result.stdout
+                    tmp_errors=result.stderr 
+
+                    terminal_results_k[i] = tmp_results
+                    terminal_errors_k[i] = tmp_errors
+
+                    ##second sshpass
+
+                    login
+
+
+                    
+
+
 
 
 

@@ -7,10 +7,13 @@ from datetime import datetime
 
 
 def check_dates (initial=None, final=None, **kwargs):
+    # script geomagixs_check_dates.pro
+    verbose = kwargs.get('verbose',True)
+    gms = kwargs.get('GMS',None)
+    system = kwargs.get('system',None)
 
-    verbose = kwargs.get('verbose',False)
-
-
+    if gms is None:
+        raise AttributeError ("El método check_dates necesita el parámetro gms.")
     try:
 
         if initial is None:
@@ -33,8 +36,30 @@ def check_dates (initial=None, final=None, **kwargs):
         if final is None:
             final= initial
         
-           
-            
+
+        #verificacion con juldays
+        # no entiendo porque se complica tanto con juldays
+
+        initial_JUL = JULDAY(initial)
+        final_JUL = JULDAY(final)
+
+        if initial_JUL < final_JUL:
+
+            raise ValueError("Entrada de datos invalido, verifique el rango de fechas introducidas.")
+
+        #verificamos con la fecha minima que se debe considerar en el sistema
+
+        lower_JUL = JULDAY(gms[system['gms']][0])
+        upper_JUL = JULDAY(gms[system['gms']][1])
+
+        if initial_JUL < lower_JUL :
+
+            raise ValueError("El valor de fecha de inicio debería ser mayor a {}.".format(gms[system['gms']][0]))
+
+        if final_JUL > upper_JUL:
+            raise ValueError ("El valor de fecha fin debe ser mayor a la fecha {}.".format(gms[system['gms']][1]))
+
+        return     
                 
                     
     except:
