@@ -361,9 +361,9 @@ class geomagixs (object):
 
             data_qd = data_qd[argsort]
  
-
-            for i in range(days_for_qdays):
-                
+            i=0
+            #for i in range(days_for_qdays):
+            while i<days_for_qdays:
                 flatten = numpy.array([data['total_k'] for data in data_qd])
                 indexes_equals1 = numpy.where(flatten==data_qd[i]['total_k'])[0]
 
@@ -390,18 +390,89 @@ class geomagixs (object):
 
                                 tmp_struct1 [indexes_equals2] = tmp_struct2[argsort3]
                                 j+=len(indexes_equals2)-1
-
-                            
-
-
+                        
+                        data_qd[indexes_equals1] = tmp_struct1[:]
                     
+                    i += len(indexes_equals1)-1
+            
+            flatten = numpy.array([data['total_k'] for data in data_qd])
+            flatten2 = numpy.array([data['total_k2'] for data in data_qd])
+            flatten3 = numpy.array([data['max_k'] for data in data_qd])
+          
+            mask1 = flatten<990
+            mask1.astype(bool)
+
+            mask2 = flatten2<990**2*8
+            mask2.astype(bool)
+
+            mask3 = flatten3<999
+            mask3.astype(bool)
+
+            mask = mask1 & mask2 & mask3
+
+            valid_days = numpy.where(mask)[0]
+            valid_days_count = numpy.count_nonzero(mask)
+
+            if valid_days_count >= 10:
+
+                if verbose:
+                    tmp_month = data_qd[valid_days[0]]['month']
+                    try:
+                        tmp_string = months[tmp_month]
+                    except:
+                        raise IndexError("Revisar los valores de months")
+
+                    if valid_days<15:
+                        tmp_y = [data_qd[valid_days[0]]['year']]
+                        tmp_d = [data['day'] for data in data_qd[valid_days]]
+
+                        tmp_chain ='{:4d}'.format(tmp_y[0])+space(1)
+                        for n,tmp in enumerate(tmp_d):
+                            tmp_chain = tmp_chain + space(2)+'{:2d}'.format(tmp)
+                            if n==4:
+                                tmp_chain = tmp_chain + space(2)
+                        
+
+                    else:
+                        tmp_y = [data_qd[valid_days[0]]['year']]
+                        tmp_d = [data['day'] for data in data_qd[valid_days]]
+                        tmp_chain ='{:4d}'.format(tmp_y[0])+space(1)
+
+                        for n,tmp in enumerate(tmp_d):
+                            tmp_chain = tmp_chain + space(2) + '{:2d}'.format(tmp)
+                            n+=1
+                            if n%5==0:
+                                tmp_chain = tmp_chain + space(2)
+
+                    str_result = '{}{}{}{}'.format(space(1),tmp_string,space(1),tmp_chain)
+                    if real_time:
+                        kword = ' [early]'
+                    else:
+                        kword = ' [final]'
+                     
  
+                    print('\n*Local {} Q & D days for {} GMS.\nMMM YYYY   Q1  Q2  Q3  Q4  Q5    Q6  Q7  Q8  Q9  Q10   D1  D2  D3  D4  D5'.format(tmp_string,self.GMS[self.system['GMS']]['name']))
+                    print(str_result)
 
 
+                resultado = {'year':0,'month':0,'day':None}
+                day = numpy.array([data['day'] for data in data_qd[valid_days[:9]]],dtype=int)
+                resultado['day'] = day
+                resultado['year'] = initial_year
+                resultado['month'] = initial_month
 
+            else:
+                resultado = {'year':0,'month':0,'day':numpy.empty(10,dtype=int)}
 
+                resultado['day'].fill(99)
+                resultado['year'] = initial_year
+                resultado['month'] = initial_month
+
+            return resultado
 
         except:
+
+
 
     def __making_processeddatafiles(self,initial,station=None
                                     ,verbose=None,real_time=None,tendency_days=None
