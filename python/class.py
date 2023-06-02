@@ -105,7 +105,10 @@ class geomagixs (object):
             ################################################
 
 
-            quiet= kwargs.get('quiet',False)
+            verbose= kwargs.get('verbose',False)
+
+            initial_date = kwargs.get('initial_date',None)
+            final_date = kwargs.get('final_date',False)
 
             ##############################################################
             keys=kwargs.keys()
@@ -135,8 +138,13 @@ class geomagixs (object):
 
             self.__setup_dates( )
                                
-            self.__mag
+            self.__quietdays_download(initial=initial_date,final= final_date,verbose=verbose)
+            station = self.GMS[self.system['gms']]['name']
+            self.__magneticdata_download(date_initial=initial_date,date_final=final_date,verbose=verbose,station=station)
+            #self.__magneticdata_
 
+ 
+        #script -> geomagixs_quietdays_download.pro
             #falta codigo 170-173
             #falta
             #falta
@@ -148,6 +156,376 @@ class geomagixs (object):
         except:
 
             raise AttributeError("Algo salio mal en el inicio del programa.")
+        
+
+    # def __getting_magneticdata(self,initial,station,verbose=False):
+
+    #     #####################################
+    #     #Iniciando fechas y horas
+    #     # 
+    #     initial_year = initial.year
+    #     initial_month = initial.month
+    #     initial_day = initial.day
+
+
+    #     name = '{:4d}{:02d}{:02d}.clean.dat'.format(initial_year,initial_month,initial_day)
+    #     file_name = '{}_{}'.format(self.GMS[self.system['gms']]['code'],name)
+
+
+    #     if not os.path.isfile(file_name):
+    #         print("Archivo {} no encontrado".format(os.path.basename(file_name)))
+        
+    #         return
+    #     else: 
+    #         with open(file_name,'r') as file:
+                
+    #             magnetic_data = file.readlines()
+
+    #             magnetic_data = numpy.array(magnetic_data,dtype='object')
+
+        
+    #     keys =  ['year','month','day','hour','minute','D','H','Z','F']
+    #     struct = dict.fromkeys(keys,0)
+
+    #     result_data = numpy.empty(magnetic_data.shape[0],dtype='object')
+    #     result_data.fill(struct)
+
+    #     #falta patron regular  linea 114
+
+
+    #     return result_data
+
+    def __getting_magneticdata(self,initial,station=None,verbose=None):
+        # script geomagixs_quietday_get.pro
+        try:
+
+            initial_year = initial.year
+            initial_month = initial.month
+            initial_day = initial.day
+
+            file_number = 1
+            name = '{:4d}{:02d}{:02d}'.format(initial_year,initial_month,initial_day)
+            file_name = '{}_{}.clean.dat'.format(self.GMS[self.system['gms']]['code'],name)
+
+            file_name = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],file_name)
+
+            exist = os.path.isfile(file_name)
+
+            if exist:
+                with open(file_name,'r') as file:
+
+                    magnetic_data = numpy.array(file.readlines(),dtype='object')
+            else:
+                raise FileNotFoundError("No se encontró el archivo {}.".format(os.path.basename(file_name)))
+                return
+            ####### Extraemos los datos    
+
+            keys =  ['year','month','day','hour','minute','D','H','Z','F']
+
+            struct = dict.fromkeys(keys,0)
+
+            resulting = numpy.empty(magnetic_data.shape[0],dtype='object')
+            resulting.fill(struct)
+
+            ##falta idle patron re 
+            #lineas 130,132
+
+
+            return resulting
+
+
+        except:
+            print("Ocurrió un error en __getting_magneticdata.")
+
+    def __reading_kmex_data(self,date,station=None,real_time=None,verbose=False):
+
+        try:
+            if real_time is None:
+                extension = '.final'
+            else:
+                extension = '.early'
+            
+            if station =='planetary':
+                extension=''
+            
+            name = '{}_{:4d}{:02d}{:02d}.k_index{}'.format(self.GMS[self.system['gms']]['code'],date.year,date.month,date.day,extension)
+
+            file_name = os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'],name)
+
+            exists = os.path.isfile(file_name)
+
+            dat_str = {'z':numpy.zeros(8),'y':0}
+
+            tmp_var = numpy.empty(6)
+            tmp_var.fill(dat_str)
+
+
+            result = {
+                'K_mex':numpy.empty(8,dtype=int),
+                'K_SUM':0,
+                'a_mex': numpy.empty(8,dtype=int),
+                'A_median':0,
+                'K_mex_max':numpy.empty(8,dtype=int),
+                'K_SUM_max':0,
+                'a_mex_max':numpy.empty(8,dtype=int),
+                'A_median_max':0,
+                'K_mex_min':numpy.empty(8,dtype=int),
+                'K_SUM_min':0,
+                'a_mex_min':numpy.empty(8,dtype=int),
+                'A_median_min':0
+            }
+
+
+            if exists:
+                with open(file_name,'r') as file:
+                    k_index_data = numpy.array(file.readlines(),dtype='object')
+                
+
+                ##falta linea 204 para captura de datos
+
+            else:
+                if verbose:
+                    Warning("Archivo perdido {}. Se procede a llenar con datos aleatorios".format(os.path.basename(file_name)))
+
+                
+                for key in result.keys():
+                    if isinstance(result['key'],numpy.ndarray):
+                        result['key'].fill(999)
+                    else:
+                        result['key']=999
+            
+
+            ###### se reemplaza los datos 
+            #falta
+
+
+            #######
+            return result 
+
+    def __getting_local_qdays(self,initial,station= None,verbose=False,real_time=False):
+        try:
+            initial_year = initial.year
+            initial_month = initial.month
+            initial_day = initial.day
+
+            #config 
+            if real_time is False:
+                days_for_qdays = JULDAY(datetime(initial_year,initial_month,1)+relativedelta(months=1))-\
+                                JULDAY(datetime(initial_year,initial_month,1))
+            else:
+                days_for_qdays = JULDAY(datetime(initial_year,initial_month,1))-\
+                                JULDAY(datetime(initial_year,initial_month,1)+relativedelta(months=-1))
+            
+
+            if real_time is False:
+                julday_tmp =JULDAY(datetime(initial_year,initial_month,1)+relativedelta(months=1))
+            else:
+                julday_tmp=JULDAY(datetime(initial_year,initial_month,1))
+            
+
+            tmp_m = 0 
+            tmp_d = 0
+            tmp_y = 0
+
+            str_tmp = { 'year' : 0, 'month':0,'day':0,'total_k':0,'total_k2':0,'max_k':0}
+
+            data_qd = numpy.empty(days_for_qdays,dtype='object')
+            data_qd.fill(str_tmp)
+
+            for i in range(days_for_qdays):
+                
+                result = CALDAT(julday_tmp+1-i)
+                data_qd[i]['year'] = result.year
+                data_qd[i]['month'] = result.month
+                data_qd[i]['day'] = result.day
+
+                tmp = self.__reading_kmex_data(result,station=station, verbose=verbose,real_time=real_time)
+
+                data_qd[i]['total_k'] = float(tmp['K_SUM'])
+                
+                
+                good_indexes = tmp['K_mex']<99
+                good_indexes_count  = numpy.count_nonzero()
+
+                if good_indexes_count <=0:
+                    data_qd[i]['total_k2'] = 999**2*8
+                    data_qd[i]['max_k'] = 999
+
+                else:
+                    data_qd[i]['total_k2'] = numpy.sum(tmp['K_mex'][good_indexes]**2)
+                    data_qd[i]['max_k']   = numpy.nanmax(tmp['K_mex'][good_indexes])
+            
+
+            sort = numpy.array([data['total_k'] for data in data_qd])
+            argsort = numpy.argsort(sort)
+
+            data_qd = data_qd[argsort]
+ 
+
+            for i in range(days_for_qdays):
+                
+                flatten = numpy.array([data['total_k'] for data in data_qd])
+                indexes_equals1 = numpy.where(flatten==data_qd[i]['total_k'])[0]
+
+
+                if len(indexes_equals1)>1:
+
+                    tmp_struct1 = data_qd[indexes_equals1]
+                    
+                    sort = numpy.array([data['total_k2']for data in tmp_struct1])
+                    argsort = numpy.argsort(sort)
+
+                    for j in range(argsort.shape[0]):
+                        temp = numpy.array([data['total_k2'] for data in tmp_struct1])
+                        indexes_equals2 = numpy.where(temp)
+
+                        for j,value in enumerate(temp):
+                            
+                            indexes_equals2 = numpy.where(temp==value)[0]
+                            if len(indexes_equals2)>1:
+                                tmp_struct2 = tmp_struct1[indexes_equals2]
+                                
+                                temp = numpy.array([data['max_k']for data in tmp_struct2])
+                                argsort3 = numpy.argsort(temp)
+
+                                tmp_struct1 [indexes_equals2] = tmp_struct2[argsort3]
+                                j+=len(indexes_equals2)-1
+
+                            
+
+
+                    
+ 
+
+
+
+
+
+        except:
+
+    def __making_processeddatafiles(self,initial,station=None
+                                    ,verbose=None,real_time=None,tendency_days=None
+                                    ,statistic_qd=None):
+        
+        try:
+            initial_year = initial.year
+            initial_month = initial.month
+            initial_day = initial.day
+
+            ###### reading data files
+
+            data_file_name = ''
+            kmex_file_name = ''
+            string_date = ''
+
+            minutes_per_day = 24*60
+            N_days = 5
+
+            if not isinstance(tendency_days,list) or not isinstance(tendency_days,numpy.ndarray) or tendency_days is not None:
+                if tendency_days>=1 and tendency_days <=15:
+                    N_days=tendency_days
+            
+            kmex_file_name = numpy.empty(N_days,dtype='object')
+
+            keys =  ['year','month','day','hour','minute','D','H','Z','F']
+
+            struct = dict.fromkeys(keys,0)
+
+            total_magnetic_data = numpy.empty(minutes_per_day*N_days,dtype='object')
+            total_magnetic_data.fill(struct)
+
+            magnetic_data = numpy.empty(minutes_per_day,dtype='object')
+            magnetic_data.fill(struct)
+
+
+            total_time = numpy.arange(minutes_per_day*N_days)
+
+            if verbose:
+                print("Recopilación de datos para: {}/{}/{}.".format(initial_day,initial_month,initial_year))
+
+                if real_time:
+                    print("Modo inicial: Usando data de los meses previos.")
+                else:
+                    print("Modo final: Usando data del mes actual.")
+
+            
+
+            for j in range(N_days):
+                result = CALDAT(JULDAY(initial+relativedelta(days=-1*j)))
+
+                string_date = '{:4d}{:02d}{:02d}'.format(result.year,result.month,result.day)
+                kmex_file_name = '{}_{}.clean.dat'.format(self.GMS[self.system['gms']]['code'],string_date)
+
+                exist = os.path.isfile(kmex_file_name)
+
+                if exist:
+
+                    magnetic_data_tmp = self.__getting_magneticdata(initial,station=station,verbose=verbose)
+
+                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['D'] = numpy.array([tmp['D'] for tmp in magnetic_data_tmp])
+                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['H'] = numpy.array([tmp['H'] for tmp in magnetic_data_tmp])
+                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['Z'] = numpy.array([tmp['Z'] for tmp in magnetic_data_tmp])
+                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['F'] = numpy.array([tmp['F'] for tmp in magnetic_data_tmp])
+
+                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['year'] = numpy.array([tmp['year'] for tmp in magnetic_data_tmp])
+                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['month'] = numpy.array([tmp['month'] for tmp in magnetic_data_tmp])
+                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['day'] = numpy.array([tmp['day'] for tmp in magnetic_data_tmp])
+                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['hour'] = numpy.array([tmp['hour'] for tmp in magnetic_data_tmp])
+                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['minute'] = numpy.array([tmp['minute'] for tmp in magnetic_data_tmp])
+                
+                else:
+                    raise RuntimeError("Error: Imposible de leer el archivo {}. Es posible que el archivo no exista o haya conflictos de permisos.".format(kmex_file_name))
+                
+            
+
+            D_D = numpy.empty(minutes_per_day,dtype=float)
+            D_D.fill(9999)
+
+            D_H = numpy.empty(minutes_per_day,dtype=float)
+            D_H.fill(999999)
+
+            D_Z  = deepcopy(D_H)
+            D_F  = deepcopy(D_H)
+            D_N  = deepcopy(D_H)
+
+            magnetic_data_N = deepcopy(D_H)
+
+            D_median = numpy.empty(minutes_per_day,dtype=float)
+            D_median.fill(9999)
+
+            D_sigma = deepcopy(D_median)
+
+            H_median = numpy.empty(minutes_per_day,dtype=float)
+            H_median.fill(999999)
+
+            Z_median = deepcopy(H_median)
+            F_median = deepcopy(H_median)
+            N_median = deepcopy(H_median)
+            H_sigma = deepcopy(H_median)
+            Z_sigma = deepcopy(H_median)
+            F_sigma = deepcopy(H_median)
+            N_sigma = deepcopy(H_median)
+
+            arc_secs_2rads = numpy.pi/(60*180)
+        ######### falta quietdaysget, nos quedamos aquiii 
+            qday_data = self.__quietda
+
+
+
+
+
+
+
+            
+        except:
+            RuntimeWarning("Ocurruió un error en makig_processddatafiles.")
+ 
+
+
+ 
+
+
+
             
     def __magneticdata_download(self,date_initial=None,date_final=None\
                                 ,station=None,verbose=False,force_all=False):
@@ -326,8 +704,69 @@ class geomagixs (object):
                     tmp_resultsm=resultm.stdout
                     tmp_errorsm=resultm.stderr
                     
-                    #self.__makin..                            
-                    #falta    
+                    date = datetime(tmp_y,tmp_m,tmp_d)
+
+                    self.__making_magneticdatafile(date,station=station,verbose=verbose)                            
+
+                    #agregar cuantos archivos se eliminan o se crean 
+                    #falta
+                    #
+                    #
+            elif self.GMS[self.system['gms']]['name'] == 'planetary':
+
+                for i in range(fnumber):
+
+                    result = CALDAT(JULDAY(datetime(date_initial.year,date_initial.month,1))+relativedelta(months=i))        
+
+                    tmp_y = result.year
+                    tmp_m = result.month
+                    tmp_d = result.day
+
+
+                    files_source_name_k [i] = 'kp{:02d}{:02d}'.format(tmp_y%1000,tmp_m)
+                    directories_source_name[i]  = 'ftp://ftp.gfz-potsdam.de/pub/home/obs/kp-ap/wdc/'
+
+
+                    if JULDAY(datetime(date_initial.year,date_final.month,1)+relativedelta(months=i)) == JULDAY(datetime(self.system['today_date'].year,\
+                                                                                                                         self.system['today_date'].month,1)):
+                        
+                        directories_source_name[i]= 'http://www-app3.gfz-potsdam.de/kp_index/'
+                        files_source_name_k[i]      = 'qlyymm.wdc' 
+                    
+                    if JULDAY(datetime(date_initial.year,date_final.month,1)+relativedelta(months=i+1)) ==JULDAY(datetime(self.system['today_date'].year,\
+                                                                                                                         self.system['today_date'].month,1)):
+                        directories_source_name[i]  = 'http://www-app3.gfz-potsdam.de/kp_index/'
+                        files_source_name_k[i]      = 'pqlyymm.wdc'
+                    
+                    directories_destiny_name[i] = os.path.join(self.system['datasource_dir'],self.GMS[''])
+
+                    tmp_results = ''
+                    tmp_errors = ''
+
+                    if verbose:
+                        print("Copiando {}{}}".format(tmp_y,tmp_m))
+
+                    name = '{:02d}{:02d}.wdc'.format(tmp_y%1000,tmp_m)
+                    command = 'wget {} -O {} kp {}'.format(os.path.join(directories_source_name[i],files_source_name_k[i]),directories_destiny_name[i],name)
+
+                    result = execute_command(command)
+
+                    error = result.stderr
+                    result = result.stdout
+
+
+
+                files_number = JULDAY(date_final)-JULDAY(date_initial)+1 
+
+                for i in files_number:
+
+                    result = CALDAT(JULDAY(date_initial))
+
+                    self.__make_planetarymagneticdatafiles(date=result,station=station,verbose=verbose)   
+
+            if verbose:
+                print("Magnetic Data ha sido actualizado.")
+
         except:
             print("Ocurrio un error")
         
@@ -423,7 +862,7 @@ class geomagixs (object):
                         
                         magnetic_data = numpy.array(buff,dtype='object')
                         
-                        number_lines= JULDAY(datetime(initial_year,initial_month,1)+relativedelta(months=1))-\
+                        number_lines= JULDAY(datetime(initial_year,initial_month,1)+relativedelta(months=+1))-\
                                        JULDAY(datetime(initial_year,initial_month,1))
                     else:
                         
@@ -431,7 +870,7 @@ class geomagixs (object):
                             ResourceWarning("Inconsistencia en los datos del archivo {},los datos están corruptos\
                                             . Se reemplazará los datos con datos aleatorios.".format(os.path.basename(file_name))) 
                             
-                        number_lines = JULDAY(datetime(initial_year,initial_month,1)+relativedelta(months=1)) - \
+                        number_lines = JULDAY(datetime(initial_year,initial_month,1)+relativedelta(months=+1)) - \
                                        JULDAY(datetime(initial_year,initial_month,1))      
                                        
                         magnetic_data = numpy.empty(number_lines, dtype='object')
@@ -525,103 +964,7 @@ class geomagixs (object):
             print("Ocurrio un error en {}".format("__make_planetarymagneticdatafiles"))
     
     
-    
-    def __magneticdata_download(self,date_ini= None,date_fin = None,verbose=False):
-
-        try:
-            update_flag = False
-
-            if date_ini is None:
-                initial = datetime.now()
-            if date_fin is None:
-                final =  initial
-
-            check_dates(date_ini,date_fin,GMS=self.GMS,system=self.system)
-
-            final_date = final 
-            initial_date = date_ini
-
-            #remember that dates belong to datetime object
-            # data format [YYYY, MM, DD] 
-            if self.GMS[self.system['gms']]['name'] == 'planetary':
-                 
-                 diff_year = final_date.year - initial_date.year
-                 diff_month = final_date.month - initial_date.month
-
-                 files_number= diff_year*12 + diff_month + 1
-            else:
-
-                files_number = JULDAY(final_date) - JULDAY(initial_date)
-
-            if verbose:
-                if update_flag is False:
-                    print("Un total de {} días de archivos van a ser reescritos. Los datos serán PERMANENTEMENTE borrados.".format(files_number)) 
-
-                else:
-                    print("Un total de {} archivos van a ser actualizados".format(files_number))           
-
-            files_source_name_k      = numpy.empty(files_number,dtype='object')
-            files_source_name_r      = numpy.empty(files_number,dtype='object')
-            directories_source_name  = numpy.empty(files_number,dtype='object')
-            files_destiny_name       = numpy.empty(files_number,dtype='object')
-            directories_destiny_name = numpy.empty(files_number,dtype='object')
-            terminal_results_k       = numpy.empty(files_number,dtype='object')
-            terminal_errors_k        = numpy.empty(files_number,dtype='object')
-            terminal_results_r       = numpy.empty(files_number,dtype='object')
-            terminal_errors_r        = numpy.empty(files_number,dtype='object')      
-
-
-            if self.GMS[self.system['gms']]['name'] == 'teoloyucan':
-
-                for i in range(files_number):
-
-                    tmp = CALDAT(JULDAY(initial_date))
-
-                    tmp_y = tmp.year
-                    tmp_m = tmp.month
-                    tmp_d = tmp.day
-
-                    files_source_name_k[i] = self.GMS[self.system['gms']]['code'] + '{:4d}{:02d}{:02d}.rK.min'.format(tmp_y,tmp_m,tmp_d)
-                    files_source_name_r[i] = self.GMS[self.system['gms']]['code'] + '{:4d}{:02d}{:02d}.rmin.min'.format(tmp_y,tmp_m,tmp_d)
-                    
-                    directories_source_name[i] = self.system['ssh_user']+'@'+self.system['ssh_address']+self.GMS[self.system['gms']]['code']+'/{:04d}/'.format(tmp_y)
-
-                    directories_destiny_name[i] = self.system['datasource_dir']+self.GMS[self.system['gms']]+'/'
- 
-                    
-                    if verbose:
-                        print('Copiando {:04d}{:02d}{:02d} archivos.'.format(tmp_y,tmp_m,tmp_d))
-
-                    ##### first sshpass
-                    login = '{} scp {} {}'.format(self.system['ssh_password'],directories_source_name[i]+files_source_name_k[i],
-                                                  directories_destiny_name[i]+files_source_name_k[i])
-                    command = 'sshpass -p {}'.format(login)
-                    result = execute_command(command)
-
-                    tmp_results=result.stdout
-                    tmp_errors=result.stderr 
-
-                    terminal_results_k[i] = tmp_results
-                    terminal_errors_k[i] = tmp_errors
-
-                    ##second sshpass
-
-                    login
-
-
-                    
-
-
-
-
-
-        except:
-
-    
-    
-    
-    
-    
+     
     
     
     
@@ -635,8 +978,7 @@ class geomagixs (object):
             
             
             #months
-            months = ['jan','feb','mar','apr','may','jun','jul','aug','sep',\
-                      'sep','oct','nov','dec']
+
             
             
             if (self.GMS[self.system['gms']]['name']=='planetary') or \
@@ -672,7 +1014,7 @@ class geomagixs (object):
                 
                 buff = f.readlines()
                 nlines = len(buff) 
-                #revisar, codigo original dice 4ll
+                #revisar, codigo original dice 4ll (revisado)
                 cabecera = 4  
                 
                 if nlines <= cabecera + 1:
