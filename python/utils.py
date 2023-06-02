@@ -6,6 +6,9 @@ import re
 from datetime import datetime
 
 
+months = ['jan','feb','mar','apr','may','jun','jul','aug','sep',\
+                      'sep','oct','nov','dec']
+
 def check_dates (initial=None, final=None, **kwargs):
     # script geomagixs_check_dates.pro
     verbose = kwargs.get('verbose',True)
