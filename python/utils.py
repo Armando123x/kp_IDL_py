@@ -70,6 +70,9 @@ def check_dates (initial=None, final=None, **kwargs):
 
 
 
+def vectorize(dict_,key):
+    #return a array with all values that belong key from dict 
+    return numpy.array([data[key] for data in dict_ ])
 
 
 def space(number):

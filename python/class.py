@@ -472,7 +472,125 @@ class geomagixs (object):
 
         except:
 
+            print("Ocurrio un error en __getting_local_qdays.")
+    def __getting_statistic_quietday(self, initial, station= None, verbose=False,real_time=False,local=False):
+        try:
+            initial_year = initial.year
+            initial_month = initial.month
+            initial_day = initial.day
 
+
+
+            kmex_days_for_median = 28
+            quadratic_limit      = 7
+            statistic_limit      = 5
+            file_number    = kmex_days_for_median+1
+
+
+            data_file_name = numpy.empty(file_number,dtype='object')
+            kmex_file_name = numpy.empty(file_number,dtype='object')
+            string_date    = numpy.empty(file_number,dtype='object')
+            tmp_julday     = JULDAY(initial)-kmex_days_for_median
+
+
+            minutes_per_day = 24*60
+
+            D_values = numpy.empty((kmex_days_for_median,minutes_per_day),dtype=float)
+            D_values.fill(9999)
+
+            H_values = numpy.empty((kmex_days_for_median,minutes_per_day),dtype=float)
+            H_values.fill(999999)
+
+            Z_values = numpy.empty((kmex_days_for_median,minutes_per_day),dtype=float)
+            Z_values.fill(999999)
+
+            F_values = numpy.empty((kmex_days_for_median,minutes_per_day),dtype=float)
+            F_values.fill(999999)
+
+            for n in range(file_number):
+
+                result = CALDAT(tmp_julday+n)
+                tmp_year = result.year
+                tmp_month = result.month
+                tmp_day   = result.day
+
+                tmp = '{:4d}{:02d}{:02d}'.format(tmp_year,tmp_month,tmp_day)
+
+                string_date[n] = tmp
+                kmex_file_name[n] = '{}_{}.clean.dat'.format(self.GMS[self.system['gms']]['code'],string_date[n])
+
+            fpath = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],kmex_file_name)
+            exists = os.path.isfile(fpath)   
+
+            for i in range(kmex_days_for_median):
+                if exists:
+
+                    result = CALDAT(tmp_julday+i)
+
+                    tmp_month = result.month
+                    tmp_year = result.year 
+                    tmp_day = result.day
+
+                    tmp_data = self.__getting_magneticdata(datetime(tmp_year,tmp_month,tmp_day),
+                                                           station=station,
+                                                           verbose=verbose,
+                                                           ) 
+                    
+                
+                    D_values[i] = vectorize(tmp_data,'D')
+                    H_values[i] = vectorize(tmp_data,'H')
+                    Z_values[i] = vectorize(tmp_data,'Z')
+                    F_values[i] = vectorize(tmp_data,'F')
+            
+            D_median = numpy.empty(minutes_per_day,dtype=float)
+            D_median.fill(9999)
+
+            D_sigma = deepcopy(D_median)
+
+            H_median = numpy.empty(minutes_per_day)
+            H_median.fill(999999)
+
+            Z_median = deepcopy(H_median)
+            F_median= deepcopy(H_median)
+            N_median= deepcopy(H_median)
+            H_sigma= deepcopy(H_median)
+            Z_sigma= deepcopy(H_median)
+            F_sigma= deepcopy(H_median)
+            N_sigma= deepcopy(H_median)
+
+            number_of_data = numpy.empty(minutes_per_day,dtype=int)
+
+            arc_secs_2rads = numpy.pi/(60*180)
+
+            keys = ['year','month','day','hour','minute','D','H','Z','F','dD','dH','dZ','dF']
+            struct = dict.fromkeys(keys,0)
+
+            qday = numpy.empty(minutes_per_day,dtype='object')
+            qday.fill(struct)
+
+            time_days = numpy.arange(kmex_days_for_median)+1
+
+            for i in range(minutes_per_day):
+
+                valid_days = H_values[:kmex_days_for_median-1,i]<999990.00
+                
+                count  = numpy.count_nonzero(valid_days)
+
+                number_of_data[i] = count
+
+                if number_of_data[i]>= statistic_limit:
+                    status_result = 1
+
+                    if number_of_data[i] >= quadratic_limit:
+
+                        result = numpy.polyfit(time_days[valid_days],D_values[valid_days,i],2)
+                        
+
+
+
+        except:
+
+            return 
 
     def __making_processeddatafiles(self,initial,station=None
                                     ,verbose=None,real_time=None,tendency_days=None
@@ -590,7 +708,7 @@ class geomagixs (object):
             
         except:
             RuntimeWarning("Ocurruió un error en makig_processddatafiles.")
- 
+            return 
 
 
  
