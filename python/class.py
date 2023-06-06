@@ -158,45 +158,11 @@ class geomagixs (object):
             raise AttributeError("Algo salio mal en el inicio del programa.")
         
 
-    # def __getting_magneticdata(self,initial,station,verbose=False):
-
-    #     #####################################
-    #     #Iniciando fechas y horas
-    #     # 
-    #     initial_year = initial.year
-    #     initial_month = initial.month
-    #     initial_day = initial.day
-
-
-    #     name = '{:4d}{:02d}{:02d}.clean.dat'.format(initial_year,initial_month,initial_day)
-    #     file_name = '{}_{}'.format(self.GMS[self.system['gms']]['code'],name)
-
-
-    #     if not os.path.isfile(file_name):
-    #         print("Archivo {} no encontrado".format(os.path.basename(file_name)))
-        
-    #         return
-    #     else: 
-    #         with open(file_name,'r') as file:
-                
-    #             magnetic_data = file.readlines()
-
-    #             magnetic_data = numpy.array(magnetic_data,dtype='object')
-
-        
-    #     keys =  ['year','month','day','hour','minute','D','H','Z','F']
-    #     struct = dict.fromkeys(keys,0)
-
-    #     result_data = numpy.empty(magnetic_data.shape[0],dtype='object')
-    #     result_data.fill(struct)
-
-    #     #falta patron regular  linea 114
-
-
-    #     return result_data
+  
 
     def __getting_magneticdata(self,initial,station=None,verbose=None):
         # script geomagixs_quietday_get.pro
+        #listo 
         try:
 
             initial_year = initial.year
@@ -227,8 +193,15 @@ class geomagixs (object):
             resulting = numpy.empty(magnetic_data.shape[0],dtype='object')
             resulting.fill(struct)
 
-            ##falta idle patron re 
-            #lineas 130,132
+            for n,linea in enumerate(magnetic_data):
+
+                valores = re.findall(r'\d+\.?\d*', linea)
+
+                valores = numpy.array([int(v) if v.isdigit() else float(v) for v in valores])
+
+                for i,key in enumerate(resulting[n].keys()):
+                    resulting[n][key]= valores[i]
+            
 
 
             return resulting
@@ -301,7 +274,8 @@ class geomagixs (object):
 
             #######
             return result 
-
+        except: 
+            pass
     def __getting_local_qdays(self,initial,station= None,verbose=False,real_time=False):
         try:
             initial_year = initial.year
@@ -377,7 +351,7 @@ class geomagixs (object):
 
                     for j in range(argsort.shape[0]):
                         temp = numpy.array([data['total_k2'] for data in tmp_struct1])
-                        indexes_equals2 = numpy.where(temp)
+                        indexes_equals2 = numpy.where(temp)[0]
 
                         for j,value in enumerate(temp):
                             
@@ -803,18 +777,262 @@ class geomagixs (object):
 
             tmp_arr[smoothing_index:60*24-1-smoothing_index] = 0 
             
-            tm
+            tmp_arr_2 = numpy.fft.ifft(tmp_arr).real 
 
+            for n,_ in enumerate(tmp_arr_2):
 
-                    
+                qday[n]['H'] = tmp_arr_2[n]  
+            
+            #suavizados por +/- 30 minutos 
+            #########################################################
+            #########################################################
+            #########################################################
+            key='H'
 
+            smooth_steps = 30
+            smooth_witdh = 10
 
+            n_elements = vectorize(qday,key).shape[0]
+            array1 = vectorize(qday[n_elements-smooth_steps:n_elements-1],key)
+            array2 = vectorize(qday[:smooth_steps-1],key)
 
+            smoothed_array =  numpy.concatenate((array1,array2))
+            smoothed_array = smooth(smoothed_array,smooth_witdh)
 
+            for n,_ in enumerate(qday[:-smooth_steps]):
+                qday[smooth_steps+n][key] = smoothed_array[n]
+            
+            for n,_ in enumerate(qday[:smooth_steps-1]):
+                qday[n][key] = smoothed_array[smooth_steps+n]
+            #########################################################
+            #########################################################
+            #########################################################
+            key='D'
+
+            smooth_steps = 30
+            smooth_witdh = 10
+
+            n_elements = vectorize(qday,key).shape[0]
+            array1 = vectorize(qday[n_elements-smooth_steps:n_elements-1],key)
+            array2 = vectorize(qday[:smooth_steps-1],key)
+
+            smoothed_array =  numpy.concatenate((array1,array2))
+            smoothed_array = smooth(smoothed_array,smooth_witdh)
+
+            for n,_ in enumerate(qday[:-smooth_steps]):
+                qday[smooth_steps+n][key] = smoothed_array[n]
+            
+            for n,_ in enumerate(qday[:smooth_steps-1]):
+                qday[n][key] = smoothed_array[smooth_steps+n]
+            #########################################################
+            #########################################################
+            #########################################################
+            key='F'
+
+            smooth_steps = 30
+            smooth_witdh = 10
+
+            n_elements = vectorize(qday,key).shape[0]
+            array1 = vectorize(qday[n_elements-smooth_steps:n_elements-1],key)
+            array2 = vectorize(qday[:smooth_steps-1],key)
+
+            smoothed_array =  numpy.concatenate((array1,array2))
+            smoothed_array = smooth(smoothed_array,smooth_witdh)
+
+            for n,_ in enumerate(qday[:-smooth_steps]):
+                qday[smooth_steps+n][key] = smoothed_array[n]
+            
+            for n,_ in enumerate(qday[:smooth_steps-1]):
+                qday[n][key] = smoothed_array[smooth_steps+n]
+            #########################################################
+            #########################################################
+            #########################################################
+            key='Z'
+
+            smooth_steps = 30
+            smooth_witdh = 10
+
+            n_elements = vectorize(qday,key).shape[0]
+            array1 = vectorize(qday[n_elements-smooth_steps:n_elements-1],key)
+            array2 = vectorize(qday[:smooth_steps-1],key)
+
+            smoothed_array =  numpy.concatenate((array1,array2))
+            smoothed_array = smooth(smoothed_array,smooth_witdh)
+
+            for n,_ in enumerate(qday[:-smooth_steps]):
+                qday[smooth_steps+n][key] = smoothed_array[n]
+            
+            for n,_ in enumerate(qday[:smooth_steps-1]):
+                qday[n][key] = smoothed_array[smooth_steps+n]
+            
+            #preparing data for storing
+            return qday
+            
+
+ 
         except:
 
             return 
+        
+    
+    def __getting_quietday(self,initial,station=None,verbose=False,real_time=False,local=None):
 
+        initial_date = initial 
+        #[YYYY, MM, DD] 
+        if real_time is True:
+
+            result = CALDAT(JULDAY(datetime(initial.year,initial.month,1)))
+            initial_date  = datetime(result.year,result.month,initial_date.day)
+
+
+        tmp_julian = JULDAY(datetime(initial_date.year,initial_date.month,1))
+        result = CALDAT(tmp_julian)
+
+        tmp_month = result.month
+        tmp_year = result.year
+        tmp_day = result.day
+
+        tmp_year0 = tmp_year
+
+        ###
+        tmp_millenium = (tmp_year//1000)*1000
+        tmp_century = ((tmp_year % 1000)//100)*100
+        tmp_decade  = (((tmp_year % 1000) %100)//10)*10
+
+        tmp_year = tmp_millenium + tmp_century + tmp_decade
+        
+
+
+        tmp_today_year = (self.system['today_date'].year//1000)+((self.system['today_date'].yearr % 1000)//100)*100+(((self.system['today_date'].year % 1000) %100)//10)*10
+
+        tmp_julian = JULDAY(datetime(initial_date.year,tmp_month,1)))
+        tmp_julian_1  = JULDAY(datetime(tmp_today_year,1,1))
+        tmp_julian_2  = JULDAY(datetime(tmp_today_year,12,31)+relativedelta(years=+9))
+
+
+
+        if tmp_julian < tmp_julian_1:
+            file_name = 'qd{:04d}{:02d}.txt'.format(tmp_year,tmp_decade+9)
+        elif (tmp_julian>= tmp_julian_1) and(tmp_julian<=tmp_julian_2):
+            file_name = 'qd{:4d}{:01d}'.format(tmp_year,tmp_decade//10)
+
+        else: 
+            Warning("Error con la entrada de dato!!!")
+            return None
+
+        
+
+        fpath = os.path.join(self.system['qdays_dir'],file_name)
+
+        exists = os.path.exists(fpath)
+        
+        if not exists:
+            FileExistsError("Error abriendo el archivo {}".format(os.path.basename(exists)))
+        
+        with open(fpath,'r') as f:
+
+            qds_list_data = numpy.array(f.readlines(),dtype='object')
+        
+        #buscamos la linea donde se encuentra la fecha deseada 
+        tmp_year = tmp_year0
+
+        tmp_doy = JULDAY(datetime(tmp_year,tmp_month,tmp_day))-JULDAY(datetime(tmp_year,1,1))
+        try:
+            tmp_string  = months[tmp_month]
+        except IndexError as e:
+            raise IndexError("Ocurrió un error al buscar el string de fechas")
+        
+        date_str = ' {} {:4d}'.format(tmp_string,tmp_year)
+
+
+
+        # Aplicar conversión a minúsculas
+        lowercase_arr = array_to_lower(qds_list_data)
+        buff = numpy.char[:9](lowercase_arr)
+
+        # numpy.core.defcharaarray return 0 si hay elementos que coinciden
+        # en otro caso solo retorna -1 
+        valid_line = numpy.core.defchararray.find(buff.astype(str), date_str)
+
+        valid_line = numpy.array([True if x == 0 else False for x in valid_line])
+        valid_line = numpy.where(valid_line)[0]
+
+        tmp_str = {'quiet_day' : numpy.empty(10,dtype=int)}
+    
+
+        count = numpy.count_nonzero(valid_line)
+        if count >0 and local is None:
+            
+            valores = qds_list_data[valid_line]
+            valores = re.findall(r'\d+', valores)
+
+            standar_day_list = numpy.array([int(x) for x in valores],dtype=int)
+            standar_day_list = numpy.array([{'quiet_day':standar_day_list}],dtype='object')
+        
+        else:
+            if local is None:
+                if verbose:
+                    ResourceWarning("Invalido o datos perdidos de planetary Q-days.\
+                                    Procediendo con LOCAL/[early] Q-days.")
+                    
+            
+            qd_tmp = self.__getting_local_qdays(initial=initial,
+                                                station=station,
+                                                verbose=verbose,
+                                                real_time=real_time)
+            ###
+            tmp_month = qd_tmp['month']
+            tmp_year = qd_tmp['year']
+
+            for n , _ in enumerate(standar_day_list):
+                standar_day_list[n]['quiet_days'] = qd_tmp['day']
+
+            if qd_tmp['day'][0] >= 99:
+                qday = self.__getting_statistic_quietday(initial=initial_date,station=station,verbose= verbose,real_time=real_time)
+                return qday
+
+        minutes_per_day = 1440
+
+        struct = { 'year' : numpy.empty(minutes_per_day,dtype=int),
+                   'month' : numpy.empty(minutes_per_day,dtype=int),
+                   'day':numpy.empty(minutes_per_day,dtype=int),
+                   'hour':numpy.empty(minutes_per_day,dtype=int),
+                   'minute':numpy.empty(minutes_per_day,dtype=int),
+                   'D': numpy.empty(minutes_per_day,dtype=float).fill(9999),
+                   'H':numpy.empty(minutes_per_day,dtype=float).fill(999999),
+                   'Z':numpy.empty(minutes_per_day,dtype=float).fill(999999),
+                   'F':numpy.empty(minutes_per_day,dtype=float).fill(999999),
+                   'D_median':9999,'H_median':999999,'Z_median':999999,'F_median':999999}
+
+        qd_data = numpy.empty(standar_day_list[0]['quiet_day'].shape[0],dtype='object')
+        qd_data.fill(struct)
+
+        struct = {'year':0 , 'month':0,'day':0,'hour':0,'minute':0,'D':9999,'H':999999,'Z':999999,
+                    'dD':9999,'dH':999999,'dZ':999999,'dF':999999}
+        qday = numpy.empty(minutes_per_day,dtype='object')
+        qday.fill(struct)
+
+        data_file_list = numpy.empty(standar_day_list[0]['quiet_day'].shape[0],dtype='object')
+
+        for i in range(standar_day_list[0]['quiet_day'].shape[0]):
+
+            tmp = self.__getting_magneticdata(initial=datetime(tmp_year,tmp_month,standar_day_list[0]['quiet_day'][i]),station=station,verbose=verbose)
+
+            qd_data[i]['year'] = tmp['year']
+
+
+
+
+
+
+            
+
+
+
+
+
+
+ 
     def __making_processeddatafiles(self,initial,station=None
                                     ,verbose=None,real_time=None,tendency_days=None
                                     ,statistic_qd=None):

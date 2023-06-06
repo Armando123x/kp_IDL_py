@@ -956,26 +956,7 @@ FUNCTION getting_quietday, initial, STATION=station, $
                         ;        qd_data[i].F[indexes_1] = 999999.0
                         ;ENDIF
                 ENDIF ;ELSE BEGIN
-               ;         qd_data[i].D_median = 9999.0
-               ;         qd_data[i].H_median = 999999.0
-               ;         qd_data[i].Z_median = 999999.0
-               ;         qd_data[i].F_median = 999999.0
-               ;ENDELSE
-;IF i EQ 0 THEN plot, qd_data[i].H[*], MAX_VALUE=60., YRANGE=[-30.,50.] $
-;       ELSE oplot, qd_data[i].H[*], MAX_VALUE=60.
-;print, i, standard_day_list.quiet_day[i], count, qd_data[i].H_median
-                ;indexes = WHERE( qd_data[i].H[*]+qd_data[i].H_median GE 999990.00 OR qd_data[i].H[*]+qd_data[i].H_median LE 0., Count )
-                ;IF Count GE 1 THEN BEGIN
-                ;        print, i, Count
-                ;        print, qd_data[i].H[indexes]
-                ;        qd_data[i].D[indexes] = 9999.0
-                ;        qd_data[i].H[indexes] = 999999.0
-                ;        qd_data[i].Z[indexes] = 999999.0
-                ;        qd_data[i].F[indexes] = 999999.0
-                ;ENDIF
-
-                ;print, i, N_ELEMENTS(WHERE(tmp.H[*] LT 999990.00))/1440.
-                ;print, i, N_ELEMENTS(WHERE(qd_data[i].H[*] LT 999990.00))/1440.
+               ;  
         ENDFOR
 ;stop
         ;print, data_file_list

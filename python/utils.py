@@ -2,12 +2,30 @@ import os
 import numpy 
 import subprocess
 import re
-
+import numpy  
+from scipy.signal import convolve
 from datetime import datetime
 
 
 months = ['jan','feb','mar','apr','may','jun','jul','aug','sep',\
                       'sep','oct','nov','dec']
+
+
+
+# Definir función para convertir a minúsculas
+array_to_lower = numpy.vectorize(lambda x: x.lower())
+
+
+
+
+def smooth(data, window_size):
+    window = numpy.ones(window_size) / window_size
+    smoothed_data = convolve(data, window, mode='same')
+    return smoothed_data
+
+
+
+
 
 def check_dates (initial=None, final=None, **kwargs):
     # script geomagixs_check_dates.pro
