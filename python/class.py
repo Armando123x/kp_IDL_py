@@ -474,7 +474,14 @@ class geomagixs (object):
 
             print("Ocurrio un error en __getting_local_qdays.")
     def __getting_statistic_quietday(self, initial, station= None, verbose=False,real_time=False,local=False):
+        def get_values(result,x,y):
+
+            pass
+        
         try:
+
+
+
             initial_year = initial.year
             initial_month = initial.month
             initial_day = initial.day
@@ -579,12 +586,228 @@ class geomagixs (object):
                 number_of_data[i] = count
 
                 if number_of_data[i]>= statistic_limit:
+
+
+
+
                     status_result = 1
 
                     if number_of_data[i] >= quadratic_limit:
 
-                        result = numpy.polyfit(time_days[valid_days],D_values[valid_days,i],2)
-                        
+                        x = time_days[valid_days]
+                        y = D_values[valid_days,i]
+                        result = numpy.polyfit(x,y,2)
+                        tendency = numpy.polyval(result,x)
+                        delta = numpy.std(tendency-y)
+
+                        sigma = numpy.isnan(result).any()
+
+                        if status_result >0 or number_of_data[i] < quadratic_limit:
+                            status_result = 0
+                            
+                            result = numpy.polyfit(x,y,1)
+                            tendency = numpy.polyval(result,x)
+                            delta = numpy.std(tendency-y)
+
+                            status_result = numpy.isnan().any()
+
+                            div = result[1]/delta[1]
+                            flag = numpy.isnan(result[1]) & numpy.isnan(delta[1])
+
+                            
+                            if div <= 0.5 and flag :
+                                status_result=1
+                            
+                        if status_result>0:
+                            qday[i]['D'] = numpy.median(y)
+                            qday[i]['dD'] = numpy.var(y)
+                        else:
+                            #INTERPOL(y, x, xinterp)
+                            qday[i]['D'] = numpy.median(y-tendency) + numpy.interp(time_days[valid_days[number_of_data[i]-1]]+1,time_days[valid_days],tendency)
+                            qday[i]['dD'] = numpy.var(y-tendency)
+
+
+                        # key = [['H_values',['H','dH']],['Z_values',['Z','dZ']]]
+                    #####################################################################
+                    #####################################################################
+                    #####################################################################
+
+                    status_result = 1
+
+                    if number_of_data[i] >= quadratic_limit:
+
+                        x = time_days[valid_days]
+                        y = H_values[valid_days,i]
+
+                        result = numpy.polyfit(x,y,2)
+                        tendency = numpy.polyval(result,x)
+                        delta = numpy.std(tendency-y)
+
+                        sigma = numpy.isnan(result).any()
+
+                        if status_result >0 or number_of_data[i] < quadratic_limit:
+                            status_result = 0
+                            
+                            result = numpy.polyfit(x,y,1)
+                            tendency = numpy.polyval(result,x)
+                            delta = numpy.std(tendency-y)
+
+                            status_result = numpy.isnan().any()
+
+                            div = result[1]/delta[1]
+                            flag = numpy.isnan(result[1]) & numpy.isnan(delta[1])
+
+                            
+                            if div <= 0.5 and flag :
+                                status_result=1
+                            
+                        if status_result>0:
+                            qday[i]['H'] = numpy.median(y)
+                            qday[i]['dH'] = numpy.var(y)
+                        else:
+                            #INTERPOL(y, x, xinterp)
+                            qday[i]['H'] = numpy.median(y-tendency) + numpy.interp(time_days[valid_days[number_of_data[i]-1]]+1,time_days[valid_days],tendency)
+                            qday[i]['dH'] = numpy.var(y-tendency)
+                    
+                    #####################################################################
+                    #####################################################################
+                    #####################################################################
+                    
+                    
+                    status_result = 1
+
+                    if number_of_data[i] >= quadratic_limit:
+
+                        x = time_days[valid_days]
+                        y = Z_values[valid_days,i]
+                        result = numpy.polyfit(x,y,2)
+                        tendency = numpy.polyval(result,x)
+                        delta = numpy.std(tendency-y)
+
+                        sigma = numpy.isnan(result).any()
+
+                        if status_result >0 or number_of_data[i] < quadratic_limit:
+                            status_result = 0
+                            
+                            result = numpy.polyfit(x,y,1)
+                            tendency = numpy.polyval(result,x)
+                            delta = numpy.std(tendency-y)
+
+                            status_result = numpy.isnan().any()
+
+                            div = result[1]/delta[1]
+                            flag = numpy.isnan(result[1]) & numpy.isnan(delta[1])
+
+                            
+                            if div <= 0.5 and flag :
+                                status_result=1
+                            
+                        if status_result>0:
+                            qday[i]['Z'] = numpy.median(y)
+                            qday[i]['dZ'] = numpy.var(y)
+                        else:
+                            #INTERPOL(y, x, xinterp)
+                            qday[i]['Z'] = numpy.median(y-tendency) + numpy.interp(time_days[valid_days[number_of_data[i]-1]]+1,time_days[valid_days],tendency)
+                            qday[i]['dZ'] = numpy.var(y-tendency)
+                    #####################################################################
+                    #####################################################################
+                    #####################################################################
+                    
+                    
+                    status_result = 1
+
+                    if number_of_data[i] >= quadratic_limit:
+
+                        x = time_days[valid_days]
+                        y = F_values[valid_days,i]
+                        result = numpy.polyfit(x,y,2)
+                        tendency = numpy.polyval(result,x)
+                        delta = numpy.std(tendency-y)
+
+                        sigma = numpy.isnan(result).any()
+
+                        if status_result >0 or number_of_data[i] < quadratic_limit:
+                            status_result = 0
+                            
+                            result = numpy.polyfit(x,y,1)
+                            tendency = numpy.polyval(result,x)
+                            delta = numpy.std(tendency-y)
+
+                            status_result = numpy.isnan().any()
+
+                            div = result[1]/delta[1]
+                            flag = numpy.isnan(result[1]) & numpy.isnan(delta[1])
+
+                            
+                            if div <= 0.5 and flag :
+                                status_result=1
+                            
+                        if status_result>0:
+                            qday[i]['F'] = numpy.median(y)
+                            qday[i]['dF'] = numpy.var(y)
+                        else:
+                            #INTERPOL(y, x, xinterp)
+                            qday[i]['F'] = numpy.median(y-tendency) + numpy.interp(time_days[valid_days[number_of_data[i]-1]]+1,time_days[valid_days],tendency)
+                            qday[i]['dF'] = numpy.var(y-tendency)
+                    #####################################################################
+                    #####################################################################
+                    #####################################################################
+                else:
+
+
+                    qday[i]['D'] = 9999
+                    qday[i]['dD'] = 9999
+
+                    qday[i]['H']=999999.0  
+                    qday[i]['dH']=999999.0  
+
+                    qday[i]['Z']=999999.0  
+                    qday[i]['dZ']=999999.0  
+                    qday[i]['F']=999999.0  
+                    qday[i]['dF']=999999.0  
+
+            for n,_ in enumerate(qday):
+                qday[n]['year'] = initial.year
+                qday[n]['month'] = initial.month
+                qday[n]['day'] = initial.day
+                try:
+                    qday[n]['hour'] = tmp_data[n]['hour']
+                    qday[n]['minute'] = tmp_data[n]['minute']
+                except IndexError:
+                    qday[n]['hour'] = vectorize(tmp_data,'hour')
+                    qday[n]['minute'] = vectorize(tmp_data,'minute')  
+
+            bool1 = vectorize(qday,'dH')
+            bool2 = .5*vectorize(qday,'H')
+            bool1 = bool1>0.05*bool2
+            bool1.astype(bool)
+
+        
+
+            bool3 = vectorize(qday,'dH')
+            th = 4*numpy.median(vectorize(qday,'dH'))
+            bool3 = bool3 > th
+            bool3.astype(bool)
+
+            clean_indexes = bool1 & bool3
+
+            clean_count = numpy.count_nonzero(clean_indexes)
+
+
+            tmp_arr = numpy.fft.fft(vectorize(qday,'H'))
+            tmp_arr_median = numpy.median(numpy.abs(tmp_arr))
+
+            #minutes
+            smoothing_period = 15
+            smoothing_index = (60*24)/numpy.ceil(smoothing_period)
+
+            tmp_arr[smoothing_index:60*24-1-smoothing_index] = 0 
+            
+            tm
+
+
+                    
+
 
 
 
