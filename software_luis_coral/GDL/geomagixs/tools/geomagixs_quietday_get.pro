@@ -1084,13 +1084,10 @@ FUNCTION getting_quietday, initial, STATION=station, $
                 deviation     = STDDEV(tmp_vector[valid_indexes]-tendency[valid_indexes])
                 median_value  = MEDIAN(ABS(tmp_vector[valid_indexes]-tendency[valid_indexes]))
                 bad_indexes = WHERE(ABS(tmp_vector-tendency) GT median_value+deviation_criteria*deviation, bad_indexes_count)
-;print, i, median_value, deviation, median_value+deviation_criteria*deviation
-;print, ABS(tmp_vector[valid_indexes]-tendency[valid_indexes])
+ 
                 IF bad_indexes_count GT 0 THEN $ ;BEGIN
                         temp_H[bad_indexes+TS_N_ELEMENTS-one_hour+i*half_hour]=tendency[bad_indexes]
-                        ;print, bad_indexes_count, '***', tmp_vector[bad_indexes]
-                        ;print, bad_indexes_count, '***', tendency[bad_indexes]
-                ;ENDIF
+ 
         ;#######################################################################
                 
         ;#######################################################################
@@ -1250,18 +1247,9 @@ goto, jump
         smoothed_dF  = TS_SMOOTH(qday[*].dF, TS_oddnumber)
         
         TS_limit     = median(ABS(temp_H[*] - smoothed_H))+0.25*STDDEV(ABS(temp_H[*] - smoothed_H))
-;print, ABS(qday[*].H-median(qday[*].H) - TS_SMOOTH(qday[*].H-median(qday[*].H), TS_oddnumber))
-;print, median(ABS(qday[*].H-median(qday[*].H) - TS_SMOOTH(qday[*].H-median(qday[*].H), TS_oddnumber))), STDDEV(ABS(qday[*].H-median(qday[*].H) - TS_SMOOTH(qday[*].H-median(qday[*].H), TS_oddnumber)))
-        ;clean_indexes = WHERE( qday[*].dH/qday[*].H GE 0.005, clean_count )
-
-        ;clean_indexes = WHERE( ABS(qday[*].H-median(qday[*].H)- TS_SMOOTH(qday[*].H-median(qday[*].H), TS_oddnumber)) GT TS_limit, clean_count )
+  
         clean_indexes = WHERE( ABS(temp_H[TS_N_ELEMENTS:2*TS_N_ELEMENTS-1]- smoothed_H[TS_N_ELEMENTS:2*TS_N_ELEMENTS-1]) GT TS_limit, clean_count )
-;print, qday[clean_indexes].dH
-;print, smoothed_dH[clean_indexes]
-;print, qday[0:9].H-median(qday[*].H)
-;print, qday[1430:1439].H-median(qday[*].H)
-;plot, qday[*].H-median(qday[*].H)
-;oplot, smoothed_H[*], linestyle=1
+ 
         IF clean_count GE 0 THEN BEGIN
 ;print, clean_count
 ;print, clean_indexes
@@ -1467,29 +1455,7 @@ FUNCTION geomagixs_quietday_get, initial, STATION=station, $
 ; initializing dates and hours
 ;##############################################################################
         CALDAT, JULDAY(initial[1],initial[2],initial[0]), tmp_month, tmp_day, tmp_year
-        initial_tmp = [tmp_year, tmp_month, tmp_day]
-
-
-        ;qday = getting_quietday(initial_tmp, STATION=station, QUIET=quiet, REAL_TIME=real_time, LOCAL=local)
-        ;help, qday
-        ;print, initial_tmp
-        ;print, qday
-        
-;        IF qdays_exist NE 1 AND NOT keyword_set(local) THEN BEGIN
-;                CALDAT, JULDAY(initial[1]-1,initial[2],initial[0]), tmp_month, tmp_day, tmp_year
-;                initial_tmp = [tmp_year, tmp_month, tmp_day]
-;                qday = getting_quietday(initial_tmp, STATION=station, QUIET=quiet, REAL_TIME=real_time, LOCAL=local)
-;                
-;                CALDAT, JULDAY(initial_tmp[1]-1,1,initial_tmp[0]), tmp_month, tmp_day, tmp_year
-;                qday0 = getting_quietday([tmp_year, tmp_month,1], STATION=station, QUIET=quiet, REAL_TIME=real_time, LOCAL=local)
-;                
-;                N_days0    = JULDAY(initial_tmp[1]-1,0,initial_tmp[0]) - JULDAY(initial_tmp[1]-2,0,initial_tmp[0])
-;                N_days1    = JULDAY(initial_tmp[1]+1,0,initial_tmp[0]) - JULDAY(initial_tmp[1],0,initial_tmp[0])
-;                N_days2    = JULDAY(initial_tmp[1]+2,0,initial_tmp[0]) - JULDAY(initial_tmp[1]+1,0,initial_tmp[0])
-;                N_days3    = JULDAY(initial_tmp[1]+2,0,initial_tmp[0]) - JULDAY(initial_tmp[1]+1,0,initial_tmp[0])
-;        ENDIF
-        
-        
+ 
         IF keyword_set(real_time) THEN $
                 IF NOT keyword_set(statistic_qd) THEN $
                         qday = getting_quietday ([tmp_year, tmp_month, tmp_day], STATION=station, QUIET=quiet, REAL_TIME=real_time, LOCAL=local) $

@@ -17,6 +17,8 @@ import os
 import subprocess
 
 from copy import deepcopy
+from scipy.interpolate import interp1d
+from scipy.signal import savgol_filter
 from datetime import datetime,timedelta
 
 import urllib.request
@@ -140,8 +142,13 @@ class geomagixs (object):
                                
             self.__quietdays_download(initial=initial_date,final= final_date,verbose=verbose)
             station = self.GMS[self.system['gms']]['name']
+            
+
+            #########################################3
+            self.__quietdays_download(initial_date,final_date,**kwargs)
             self.__magneticdata_download(date_initial=initial_date,date_final=final_date,verbose=verbose,station=station)
-            #self.__magneticdata_
+            #self.__magneticdata_prep
+
 
  
         #script -> geomagixs_quietdays_download.pro
@@ -156,10 +163,147 @@ class geomagixs (object):
         except:
 
             raise AttributeError("Algo salio mal en el inicio del programa.")
-        
+
+
+
+    def __getting_magneticdata_forcleaning(self,initial,**kwargs):
+
+        station = kwargs.get('station',None)
+        verbose = kwargs.get('verbose',False)
+
+
+        initial_year = initial.year
+        initial_month= initial.month
+        initial_day = initial.day
+
+
+        initial_hour = initial.minute
+        initil_minute = initial.minute
+
+        ###########
+        filename = '{}_{:4d}{:02d}{:02d}'.format(self.GMS[self.system['GMS']]['code'],initial_year,initial_month,initial_day)
+        filename = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],filename)
+
+        exists = os.path.isfile(filename)
+
+        if exists:
+            keys = ['year','month','day','hour','minute','doy','D','F','H','Z']
+
+            struct = dict.fromkeys(keys,0)
+
+
+
+            with open(exists,'r') as f:
+
+                
+                resulting_data = numpy.empty(numpy.array(f.readlines(),dtype='object').shape[0],dtype='object')
+                resulting_data.fill(struct)
+                for n,linea in enumerate(f.readlines()):
+                    valores = re.findall(r'\d+\.?\d*', linea)
+
+                    # Convertir los valores a enteros o números de punto flotante según corresponda
+                    valores = [int(v) if v.isdigit() else float(v) for v in valores]
+
+                    for key,value in zip(resulting_data.keys(),valores):
+
+                        resulting_data[n][key] = value
+            
+
+            return resulting_data
+        else:
+            return None
+    
+
+    def __fixing_datafile (file_date, **kwargs):
+
+        station = kwargs.get('station',None)
+        verbose = kwargs.get('verbose',None)
+
+
+
+
+
+
+
+    
+    def __quietday_get(self,initial,station,verbose=False,real_time=False,force_all=False,local=None,statistic_qd=False):
+        #script geomagix_quietday_get
+        #        @geomagixs_commons
+        # geomagixs_setup_commons, /QUIET
+        # geomagixs_check_system, /QUIET
+        # geomagixs_setup_dates, STATION=station, /QUIET
+        if station == 'planetary':
+            if verbose:
+                Warning("Inconsistencia: Las condiciones solicitidadas podrían comprometer\
+                         los resultados calculados. Es imposible o innecesario calcular Q-day para planetary GMS.")
 
   
+        update_flag = 0 
 
+        if initial is None:
+            initial = self.system['today_date']
+        
+        if station is None:
+
+            Warning('Debe definir la estación para el quietday.')
+
+            return 
+
+        result = CALDAT(JULDAY(initial))
+        
+        initial_tmp = result
+
+        if real_time:
+            if statistic_qd is False:
+                qday = self.__getting_quietday(initial_tmp,station=station,verbose=verbose,
+                                               real_time=real_time, local=local)
+            else:
+                qday = self.__getting_statistic_quietday(initial_tmp, station=station,verbose=verbose,
+                                                         real_time=real_time, local=local)
+        #[YYYY, MM, DD]
+        else:
+
+            result  = CALDAT(JULDAY(datetime(initial_tmp.year,initial_tmp.month,1)+relativedelta(days=-1)))
+            tmp_month,tmp_year,tmp_day = result.month,result.year,result.day
+            qday0 = self.__getting_quietday(datetime(tmp_year,tmp_month,1),station=station,verbose=verbose, local=local)
+            N_days0 = JULDAY(datetime(initial_tmp.year,initial_tmp.month,1)+relativedelta(days=-1)) - \
+                      JULDAY(datetime(initial_tmp.year,initial_tmp.month,1)+relativedelta(days=-1)+relativedelta(months=-1))
+
+            result  = CALDAT(JULDAY(datetime(initial_tmp.year,initial_tmp.month,1)))
+            tmp_month,tmp_year,tmp_day = result.month,result.year,result.day
+            qday1 = self.__getting_quietday(datetime(tmp_year,tmp_month,1),station=station,verbose=verbose, local=local)
+            N_days1 = JULDAY(datetime(initial_tmp.year,initial_tmp.month,1)+relativedelta(months=1)+relativedelta(days=-1)) - \
+                      JULDAY(datetime(initial_tmp.year,initial_tmp.month,1)+relativedelta(days=-1))
+
+            result  = CALDAT(JULDAY(datetime(initial_tmp.year,initial_tmp.month,1)+relativedelta(months=+1)))
+            tmp_month,tmp_year,tmp_day = result.month,result.year,result.day
+            qday2  = self.__getting_quietday(datetime(tmp_year,tmp_month,1),station=station,verbose=verbose, local=local)          
+            N_days2 = JULDAY(datetime(initial_tmp.year,initial_tmp.month,1)+relativedelta(months=+2)+relativedelta(days=-1)) - \
+                      JULDAY(datetime(initial_tmp.year,initial_tmp.month,1)+relativedelta(months=+1)+relativedelta(days=-1))
+
+
+            N_days = JULDAY(initial_tmp)-JULDAY(datetime(initial_tmp.year,initial_tmp.month,initial_tmp.day)+relativedelta(days=-1))
+
+            v = numpy.array([N_days0//2,N_days0+N_days1//2,N_days0+N_days1+N_days2//2])
+            w = numpy.array([N_days+1*N_days])
+
+            qday  = deepcopy(qday1)
+            #INTERPOL( V, X, XOUT )
+            for i in range(vectorize(qday1,'H').shape[0]):
+                DH = numpy.interp(w,v[qday0[i]['H'],qday1[i]['H'],qday2[i]['H']])           
+                DD= numpy.interp(w,v[qday0[i]['D'],qday1[i]['D'],qday2[i]['D']])           
+                DZ = numpy.interp(w,v[qday0[i]['Z'],qday1[i]['Z'],qday2[i]['Z']])           
+                DF = numpy.interp(w,v[qday0[i]['F'],qday1[i]['F'],qday2[i]['F']])           
+                
+                qday[i]['H'] = DH
+                qday[i]['D'] = DD
+                qday[i]['Z'] = DZ
+                qday[i]['F'] = DF
+
+                qday[i]['day']  = initial_tmp.year
+
+
+        return qday     
     def __getting_magneticdata(self,initial,station=None,verbose=None):
         # script geomagixs_quietday_get.pro
         #listo 
@@ -562,10 +706,7 @@ class geomagixs (object):
                 if number_of_data[i]>= statistic_limit:
 
 
-
-
-                    status_result = 1
-
+ 
                     if number_of_data[i] >= quadratic_limit:
 
                         x = time_days[valid_days]
@@ -574,10 +715,10 @@ class geomagixs (object):
                         tendency = numpy.polyval(result,x)
                         delta = numpy.std(tendency-y)
 
-                        sigma = numpy.isnan(result).any()
+                        status_result = numpy.isnan(result).any()
 
-                        if status_result >0 or number_of_data[i] < quadratic_limit:
-                            status_result = 0
+                        if status_result is True or number_of_data[i] < quadratic_limit:
+                            
                             
                             result = numpy.polyfit(x,y,1)
                             tendency = numpy.polyval(result,x)
@@ -592,7 +733,7 @@ class geomagixs (object):
                             if div <= 0.5 and flag :
                                 status_result=1
                             
-                        if status_result>0:
+                        if status_result:
                             qday[i]['D'] = numpy.median(y)
                             qday[i]['dD'] = numpy.var(y)
                         else:
@@ -606,7 +747,7 @@ class geomagixs (object):
                     #####################################################################
                     #####################################################################
 
-                    status_result = 1
+                    
 
                     if number_of_data[i] >= quadratic_limit:
 
@@ -617,10 +758,10 @@ class geomagixs (object):
                         tendency = numpy.polyval(result,x)
                         delta = numpy.std(tendency-y)
 
-                        sigma = numpy.isnan(result).any()
+                        status_result = numpy.isnan(result).any()
 
-                        if status_result >0 or number_of_data[i] < quadratic_limit:
-                            status_result = 0
+                        if status_result is True or number_of_data[i] < quadratic_limit:
+                          
                             
                             result = numpy.polyfit(x,y,1)
                             tendency = numpy.polyval(result,x)
@@ -633,9 +774,9 @@ class geomagixs (object):
 
                             
                             if div <= 0.5 and flag :
-                                status_result=1
+                                status_result=True
                             
-                        if status_result>0:
+                        if status_result is True:
                             qday[i]['H'] = numpy.median(y)
                             qday[i]['dH'] = numpy.var(y)
                         else:
@@ -646,9 +787,7 @@ class geomagixs (object):
                     #####################################################################
                     #####################################################################
                     #####################################################################
-                    
-                    
-                    status_result = 1
+              
 
                     if number_of_data[i] >= quadratic_limit:
 
@@ -658,10 +797,10 @@ class geomagixs (object):
                         tendency = numpy.polyval(result,x)
                         delta = numpy.std(tendency-y)
 
-                        sigma = numpy.isnan(result).any()
+                        status_result = numpy.isnan(result).any()
 
-                        if status_result >0 or number_of_data[i] < quadratic_limit:
-                            status_result = 0
+                        if status_result is True or number_of_data[i] < quadratic_limit:
+                             
                             
                             result = numpy.polyfit(x,y,1)
                             tendency = numpy.polyval(result,x)
@@ -674,9 +813,9 @@ class geomagixs (object):
 
                             
                             if div <= 0.5 and flag :
-                                status_result=1
+                                status_result=True
                             
-                        if status_result>0:
+                        if status_result is True:
                             qday[i]['Z'] = numpy.median(y)
                             qday[i]['dZ'] = numpy.var(y)
                         else:
@@ -698,9 +837,9 @@ class geomagixs (object):
                         tendency = numpy.polyval(result,x)
                         delta = numpy.std(tendency-y)
 
-                        sigma = numpy.isnan(result).any()
+                        status_result = numpy.isnan(result).any()
 
-                        if status_result >0 or number_of_data[i] < quadratic_limit:
+                        if status_result is True or number_of_data[i] < quadratic_limit:
                             status_result = 0
                             
                             result = numpy.polyfit(x,y,1)
@@ -714,9 +853,9 @@ class geomagixs (object):
 
                             
                             if div <= 0.5 and flag :
-                                status_result=1
+                                status_result=True
                             
-                        if status_result>0:
+                        if status_result is True :
                             qday[i]['F'] = numpy.median(y)
                             qday[i]['dF'] = numpy.var(y)
                         else:
@@ -905,7 +1044,7 @@ class geomagixs (object):
 
         tmp_today_year = (self.system['today_date'].year//1000)+((self.system['today_date'].yearr % 1000)//100)*100+(((self.system['today_date'].year % 1000) %100)//10)*10
 
-        tmp_julian = JULDAY(datetime(initial_date.year,tmp_month,1)))
+        tmp_julian = JULDAY(datetime(initial_date.year,tmp_month,1))
         tmp_julian_1  = JULDAY(datetime(tmp_today_year,1,1))
         tmp_julian_2  = JULDAY(datetime(tmp_today_year,12,31)+relativedelta(years=+9))
 
@@ -1018,7 +1157,507 @@ class geomagixs (object):
 
             tmp = self.__getting_magneticdata(initial=datetime(tmp_year,tmp_month,standar_day_list[0]['quiet_day'][i]),station=station,verbose=verbose)
 
-            qd_data[i]['year'] = tmp['year']
+            for k in ['year','month','day','hour','minute','D','H','Z','F']:
+                qd_data[i][k] = vectorize(tmp,k)
+            
+
+            bool1 = qd_data[i]['H'] < 999990.00
+            bool1.astype(bool)
+
+            bool2 = qd_data[i]['H'] > 0 
+            bool2.astype(bool)
+
+            mask = bool1 & bool2 
+
+            indexes = numpy.where(mask)[0]
+            count = numpy.count_nonzero(mask)
+            
+
+            if count >0:
+                for a,b in zip(['D_median','H_median','Z_median','F_median'],['D','H','Z','F']):
+                    qd_data[i][a] = numpy.median(qd_data[i][b][indexes])
+                    qd_data[i][b][indexes] -= qd_data[i][a]
+
+
+        for n, _ in enumerate(qday):
+
+            qday[n]['year'] = initial_date.year
+            qday[n]['month'] = initial_date.month
+            qday[n]['day']  = 1
+            qday[n]['hour'] = qd_data[0]['hour']
+            qday[n]['minute'] = qd_data[0]['minute']
+
+
+        buff_h = numpy.vectorize(qd_data,'H')
+
+        for i in range(minutes_per_day):
+        
+            mask = numpy.ravel(buff_h[:,i]) < 999990.00
+
+            count = numpy.count_nonzero(mask)
+            
+            indexes = numpy.where(mask)[0]
+
+            
+                
+            for a,da in zip(['D','H','Z','F'],['dD','dH','dZ','dF']):
+                if count >= 2 and count <5 :
+                    buff = vectorize(qd_data[indexes],a)
+                    qday[i][a] = numpy.mean(buff[:,i])+ numpy.median(buff)
+                    qday[i][da] = numpy.std(buff[:,i])
+
+                elif count >= 5:
+                    buff = vectorize(qd_data[indexes[:4]],a)
+                    qday[i][a] = numpy.mean(buff[:,i])+ numpy.median(buff)
+                    qday[i][da] = numpy.std(buff[:,i])                    
+                
+        
+
+        TS_oddnumber = 11 
+        TS_N_ELEMENTS = numpy.ravel(vectorize(qday,'H')).shape[0]
+
+        temp_H = numpy.empty(3*TS_N_ELEMENTS,dtype = float)
+        temp_D = deepcopy(temp_H)
+        temp_Z = deepcopy(temp_H)
+        temp_F = deepcopy(temp_H)
+
+        #########################################################################
+        #########################################################################
+        #########################################################################
+
+        temp_H [:TS_N_ELEMENTS-1] = numpy.ravel(vectorize(qday,'H'))
+        temp_H [TS_N_ELEMENTS:2*TS_N_ELEMENTS-1] = numpy.ravel(vectorize(qday,'H'))
+        temp_H [2*TS_N_ELEMENTS:] = numpy.ravel(vectorize(qday,'H'))
+        
+        mask = temp_H < 999990
+        mask.astype(bool)
+
+        tmp_valid_indexes_count = numpy.count_nonzero(mask)
+        tmp_valid_indexes =  numpy.where(mask)[0]
+
+        if tmp_valid_indexes_count <=0 :
+            raise ValueError("Error critico: No hay datos para calcular Quiet Day")
+
+        tmp_median = numpy.median(temp_H[tmp_valid_indexes])
+        temp_H[tmp_valid_indexes] -= tmp_median
+        #########################################################################
+        #########################################################################
+        #########################################################################
+        
+        temp_D [:TS_N_ELEMENTS-1] = numpy.ravel(vectorize(qday,'D'))
+        temp_D [TS_N_ELEMENTS:2*TS_N_ELEMENTS-1] = numpy.ravel(vectorize(qday,'D'))
+        temp_D [2*TS_N_ELEMENTS:] = numpy.ravel(vectorize(qday,'D'))
+        
+        mask = temp_D < 999990
+        mask.astype(bool)
+
+        tmp_valid_indexes_count = numpy.count_nonzero(mask)
+        tmp_valid_indexes =  numpy.where(mask)[0]
+
+        if tmp_valid_indexes_count <=0 :
+            raise ValueError("Error critico: No hay datos para calcular Quiet Day")
+
+        tmp_median = numpy.median(temp_D[tmp_valid_indexes])
+        temp_D[tmp_valid_indexes] -= tmp_median
+
+        #########################################################################
+        #########################################################################
+        #########################################################################
+        
+        temp_Z [:TS_N_ELEMENTS-1] = numpy.ravel(vectorize(qday,'Z'))
+        temp_Z [TS_N_ELEMENTS:2*TS_N_ELEMENTS-1] = numpy.ravel(vectorize(qday,'Z'))
+        temp_Z [2*TS_N_ELEMENTS:] = numpy.ravel(vectorize(qday,'Z'))
+        
+        mask = temp_Z < 999990
+        mask.astype(bool)
+
+        tmp_valid_indexes_count = numpy.count_nonzero(mask)
+        tmp_valid_indexes =  numpy.where(mask)[0]
+
+        if tmp_valid_indexes_count <=0 :
+            raise ValueError("Error critico: No hay datos para calcular Quiet Day")
+
+        tmp_median = numpy.median(temp_Z[tmp_valid_indexes])
+        temp_Z[tmp_valid_indexes] -= tmp_median
+
+        #########################################################################
+        #########################################################################
+        #########################################################################
+        
+        temp_F [:TS_N_ELEMENTS-1] = numpy.ravel(vectorize(qday,'F'))
+        temp_F [TS_N_ELEMENTS:2*TS_N_ELEMENTS-1] = numpy.ravel(vectorize(qday,'F'))
+        temp_F [2*TS_N_ELEMENTS:] = numpy.ravel(vectorize(qday,'F'))
+        
+        mask = temp_F < 999990
+        mask.astype(bool)
+
+        tmp_valid_indexes_count = numpy.count_nonzero(mask)
+        tmp_valid_indexes =  numpy.where(mask)[0]
+
+        if tmp_valid_indexes_count <=0 :
+            raise ValueError("Error critico: No hay datos para calcular Quiet Day")
+
+        tmp_median = numpy.median(temp_F[tmp_valid_indexes])
+        temp_F[tmp_valid_indexes] -= tmp_median
+
+
+
+        #########################################################################
+
+        half_hour = 30 
+        one_hour = 60
+        one_day = 24*one_hour
+
+        one_hour_arr = numpy.arange(one_hour)
+        three_days_arr = numpy.arange(TS_N_ELEMENTS)
+
+        deviation_criteria = .5
+
+        for i in range(51):
+            
+            ####################
+            # H-section
+            tmp_vector = temp_H[TS_N_ELEMENTS-one_hour+i*half_hour:TS_N_ELEMENTS+i*half_hour-1]
+            mask = tmp_vector <999990.0
+            mask.astype(bool)
+
+
+            count = numpy.count_nonzero(mask)
+            valid_indexes = numpy.where(mask)[0]
+
+            if count <= 0 :
+                raise ValueError("Error critico, no hay datos para calcular Quiet Day")
+
+
+            result = numpy.polyfit(one_hour_arr[valid_indexes],tmp_vector,2)
+            status_result = numpy.isnan(result).any()
+            tendency = numpy.polyval(result,one_hour_arr[valid_indexes])
+            
+            if status_result is True:
+                result = numpy.polyfit(one_hour_arr[valid_indexes],tmp_vector,1)
+                tendency = numpy.polyval(result,one_hour_arr[valid_indexes])
+                delta = numpy.std(tendency-tmp_vector)
+
+                if result[1]/delta[1] <= 0.5:
+                    status_result = True
+                
+            if status_result is True: 
+                #INTERPOL(y, x, xinterp)
+
+                interp = interp1d (one_hour_arr[valid_indexes],tmp_vector[valid_indexes],kind='quadratic')
+                tendency = interp(one_hour_arr)
+                  
+            
+            deviation = numpy.std(tmp_vector[valid_indexes]-tendency[valid_indexes])
+            median_value = numpy.median(numpy.abs(tmp_vector[valid_indexes]-tendency[valid_indexes]))
+
+            mask = numpy.abs(tmp_vector-tendency)>(median_value+deviation_criteria*deviation) 
+
+            mask.astype(bool)
+
+            bad_indexes_count = numpy.count_nonzero(mask)[0]
+            bad_indexes = numpy.where(mask)[0]
+
+            if bad_indexes_count >0:
+                temp_H[bad_indexes + TS_N_ELEMENTS -one_hour + i*half_hour] = tendency[bad_indexes]
+
+            
+            ####################
+            # D-section
+            tmp_vector = temp_D[TS_N_ELEMENTS-one_hour+i*half_hour:TS_N_ELEMENTS+i*half_hour-1]
+            mask = tmp_vector <999990.0
+            mask.astype(bool)
+
+
+            count = numpy.count_nonzero(mask)
+            valid_indexes = numpy.where(mask)[0]
+
+            if count <= 0 :
+                raise ValueError("Error critico, no hay datos para calcular Quiet Day")
+
+
+            result = numpy.polyfit(one_hour_arr[valid_indexes],tmp_vector,2)
+            status_result = numpy.isnan(result).any()
+            tendency = numpy.polyval(result,one_hour_arr[valid_indexes])
+            
+            if status_result is True:
+                result = numpy.polyfit(one_hour_arr[valid_indexes],tmp_vector,1)
+                tendency = numpy.polyval(result,one_hour_arr[valid_indexes])
+                delta = numpy.std(tendency-tmp_vector)
+
+                if result[1]/delta[1] <= 0.5:
+                    status_result = True
+                
+            if status_result is True: 
+                #INTERPOL(y, x, xinterp)
+                interp = interp1d (one_hour_arr[valid_indexes],tmp_vector[valid_indexes],kind='quadratic')
+                tendency = interp(one_hour_arr)
+
+
+            deviation = numpy.std(tmp_vector[valid_indexes]-tendency[valid_indexes])
+            median_value = numpy.median(numpy.abs(tmp_vector[valid_indexes]-tendency[valid_indexes]))
+
+            mask = numpy.abs(tmp_vector-tendency)>(median_value+deviation_criteria*deviation) 
+
+            mask.astype(bool)
+
+            bad_indexes_count = numpy.count_nonzero(mask)[0]
+            bad_indexes = numpy.where(mask)[0]
+
+            if bad_indexes_count >0:
+                temp_D[bad_indexes + TS_N_ELEMENTS -one_hour + i*half_hour] = tendency[bad_indexes]
+
+            
+            ####################
+            # Z-section
+            tmp_vector = temp_Z[TS_N_ELEMENTS-one_hour+i*half_hour:TS_N_ELEMENTS+i*half_hour-1]
+            mask = tmp_vector <999990.0
+            mask.astype(bool)
+
+
+            count = numpy.count_nonzero(mask)
+            valid_indexes = numpy.where(mask)[0]
+
+            if count <= 0 :
+                raise ValueError("Error critico, no hay datos para calcular Quiet Day")
+
+
+            result = numpy.polyfit(one_hour_arr[valid_indexes],tmp_vector,2)
+            status_result = numpy.isnan(result).any()
+            tendency = numpy.polyval(result,one_hour_arr[valid_indexes])
+            
+            if status_result is True:
+                result = numpy.polyfit(one_hour_arr[valid_indexes],tmp_vector,1)
+                tendency = numpy.polyval(result,one_hour_arr[valid_indexes])
+                delta = numpy.std(tendency-tmp_vector)
+
+                if result[1]/delta[1] <= 0.5:
+                    status_result = True
+                
+            if status_result is True: 
+                #INTERPOL(y, x, xinterp)
+                interp = interp1d (one_hour_arr[valid_indexes],tmp_vector[valid_indexes],kind='quadratic')
+                tendency = interp(one_hour_arr)
+
+
+            deviation = numpy.std(tmp_vector[valid_indexes]-tendency[valid_indexes])
+            median_value = numpy.median(numpy.abs(tmp_vector[valid_indexes]-tendency[valid_indexes]))
+
+            mask = numpy.abs(tmp_vector-tendency)>(median_value+deviation_criteria*deviation) 
+
+            mask.astype(bool)
+
+            bad_indexes_count = numpy.count_nonzero(mask)[0]
+            bad_indexes = numpy.where(mask)[0]
+
+            if bad_indexes_count >0:
+                temp_Z[bad_indexes + TS_N_ELEMENTS -one_hour + i*half_hour] = tendency[bad_indexes]
+            
+            ####################
+            # F-section
+            tmp_vector = temp_F[TS_N_ELEMENTS-one_hour+i*half_hour:TS_N_ELEMENTS+i*half_hour-1]
+            mask = tmp_vector <999990.0
+            mask.astype(bool)
+
+
+            count = numpy.count_nonzero(mask)
+            valid_indexes = numpy.where(mask)[0]
+
+            if count <= 0 :
+                raise ValueError("Error critico, no hay datos para calcular Quiet Day")
+
+
+            result = numpy.polyfit(one_hour_arr[valid_indexes],tmp_vector,2)
+            status_result = numpy.isnan(result).any()
+            tendency = numpy.polyval(result,one_hour_arr[valid_indexes])
+            
+            if status_result is True:
+                result = numpy.polyfit(one_hour_arr[valid_indexes],tmp_vector,1)
+                tendency = numpy.polyval(result,one_hour_arr[valid_indexes])
+                delta = numpy.std(tendency-tmp_vector)
+
+                if result[1]/delta[1] <= 0.5:
+                    status_result = True
+                
+            if status_result is True: 
+                #INTERPOL(y, x, xinterp)
+                interp = interp1d (one_hour_arr[valid_indexes],tmp_vector[valid_indexes],kind='quadratic')
+                tendency = interp(one_hour_arr)
+
+
+            deviation = numpy.std(tmp_vector[valid_indexes]-tendency[valid_indexes])
+            median_value = numpy.median(numpy.abs(tmp_vector[valid_indexes]-tendency[valid_indexes]))
+
+            mask = numpy.abs(tmp_vector-tendency)>(median_value+deviation_criteria*deviation) 
+
+            mask.astype(bool)
+
+            bad_indexes_count = numpy.count_nonzero(mask)[0]
+            bad_indexes = numpy.where(mask)[0]
+
+            if bad_indexes_count >0:
+                temp_F[bad_indexes + TS_N_ELEMENTS -one_hour + i*half_hour] = tendency[bad_indexes]
+
+
+        two_hour_arr = numpy.arange(2*one_hour)
+        Delta_time = 40 
+        minutes_for_smoothing = 11
+
+        ##############################
+        # H-section 
+        key = 'H'
+        buff = numpy.ravel(vectorize(qday,key))
+        mask = buff > 999990
+        mask.astype(bool)
+        tmp_valid_indexes_count = numpy.count_nonzero(mask)
+        tmp_valid_indexes = numpy.where(mask)[0]
+
+        if tmp_valid_indexes_count <0 : raise ValueError("No hay data para calcular Quiet Day.")
+
+        tmp_median = numpy.median(vectorize(qday[tmp_valid_indexes],key))
+        #INTERPOL(y, x, xinterp)
+
+        x  = numpy.ravel(numpy.array([two_hour_arr[0:one_hour-Delta_time-1], two_hour_arr[one_hour+Delta_time:2*one_hour-1]]))
+        y  = numpy.ravel(numpy.array([temp_H[2*TS_N_ELEMENTS-one_hour:2*TS_N_ELEMENTS-1-Delta_time], temp_H[TS_N_ELEMENTS+Delta_time:TS_N_ELEMENTS+one_hour-1]]))
+        xest = two_hour_arr
+
+        f = interp1d(x,y,kind='cubic')
+        
+        tendency = f(xest)
+
+        temp_H[TS_N_ELEMENTS:TS_N_ELEMENTS+one_hour-1]     = tendency[one_hour:2*one_hour-1]
+        temp_H[2*TS_N_ELEMENTS-one_hour:2*TS_N_ELEMENTS-1] = tendency[0:one_hour-1]
+
+        for n,_ in enumerate(qday):
+            qday[n][key] = savgol_filter(temp_H [TS_N_ELEMENTS:2*TS_N_ELEMENTS-1],minutes_for_smoothing,10)+tmp_median
+        
+  
+        ##############################
+        # D-section 
+        key = 'D'
+        buff = numpy.ravel(vectorize(qday,key))
+        mask = buff > 999990
+        mask.astype(bool)
+        tmp_valid_indexes_count = numpy.count_nonzero(mask)
+        tmp_valid_indexes = numpy.where(mask)[0]
+
+        if tmp_valid_indexes_count <0 : raise ValueError("No hay data para calcular Quiet Day.")
+
+        tmp_median = numpy.median(vectorize(qday[tmp_valid_indexes],key))
+        #INTERPOL(y, x, xinterp)
+
+        x  = numpy.ravel(numpy.array([two_hour_arr[0:one_hour-Delta_time-1], two_hour_arr[one_hour+Delta_time:2*one_hour-1]]))
+        y  = numpy.ravel(numpy.array([temp_D[2*TS_N_ELEMENTS-one_hour:2*TS_N_ELEMENTS-1-Delta_time], temp_D[TS_N_ELEMENTS+Delta_time:TS_N_ELEMENTS+one_hour-1]]))
+        xest = two_hour_arr
+
+        f = interp1d(x,y,kind='cubic')
+        
+        tendency = f(xest)
+
+        temp_D[TS_N_ELEMENTS:TS_N_ELEMENTS+one_hour-1]     = tendency[one_hour:2*one_hour-1]
+        temp_D[2*TS_N_ELEMENTS-one_hour:2*TS_N_ELEMENTS-1] = tendency[0:one_hour-1]
+
+        for n,_ in enumerate(qday):
+            qday[n][key] = savgol_filter(temp_D[TS_N_ELEMENTS:2*TS_N_ELEMENTS-1],minutes_for_smoothing,10)+tmp_median
+        
+        ##############################
+        # Z-section 
+        key = 'Z'
+        buff = numpy.ravel(vectorize(qday,key))
+        mask = buff > 999990
+        mask.astype(bool)
+        tmp_valid_indexes_count = numpy.count_nonzero(mask)
+        tmp_valid_indexes = numpy.where(mask)[0]
+
+        if tmp_valid_indexes_count <0 : raise ValueError("No hay data para calcular Quiet Day.")
+
+        tmp_median = numpy.median(vectorize(qday[tmp_valid_indexes],key))
+        #INTERPOL(y, x, xinterp)
+
+        x  = numpy.ravel(numpy.array([two_hour_arr[0:one_hour-Delta_time-1], two_hour_arr[one_hour+Delta_time:2*one_hour-1]]))
+        y  = numpy.ravel(numpy.array([temp_Z[2*TS_N_ELEMENTS-one_hour:2*TS_N_ELEMENTS-1-Delta_time], temp_Z[TS_N_ELEMENTS+Delta_time:TS_N_ELEMENTS+one_hour-1]]))
+        xest = two_hour_arr
+
+        f = interp1d(x,y,kind='cubic')
+        
+        tendency = f(xest)
+
+        temp_Z[TS_N_ELEMENTS:TS_N_ELEMENTS+one_hour-1]     = tendency[one_hour:2*one_hour-1]
+        temp_Z[2*TS_N_ELEMENTS-one_hour:2*TS_N_ELEMENTS-1] = tendency[0:one_hour-1]
+
+        for n,_ in enumerate(qday):
+            qday[n][key] = savgol_filter(temp_Z[TS_N_ELEMENTS:2*TS_N_ELEMENTS-1],minutes_for_smoothing,10)+tmp_median
+        
+        ##############################
+        # Z-section 
+        key = 'Z'
+        buff = numpy.ravel(vectorize(qday,key))
+        mask = buff > 999990
+        mask.astype(bool)
+        tmp_valid_indexes_count = numpy.count_nonzero(mask)
+        tmp_valid_indexes = numpy.where(mask)[0]
+
+        if tmp_valid_indexes_count <0 : raise ValueError("No hay data para calcular Quiet Day.")
+
+        tmp_median = numpy.median(vectorize(qday[tmp_valid_indexes],key))
+        #INTERPOL(y, x, xinterp)
+
+        x  = numpy.ravel(numpy.array([two_hour_arr[0:one_hour-Delta_time-1], two_hour_arr[one_hour+Delta_time:2*one_hour-1]]))
+        y  = numpy.ravel(numpy.array([temp_Z[2*TS_N_ELEMENTS-one_hour:2*TS_N_ELEMENTS-1-Delta_time], temp_Z[TS_N_ELEMENTS+Delta_time:TS_N_ELEMENTS+one_hour-1]]))
+        xest = two_hour_arr
+
+        f = interp1d(x,y,kind='cubic')
+        
+        tendency = f(xest)
+
+        temp_Z[TS_N_ELEMENTS:TS_N_ELEMENTS+one_hour-1]     = tendency[one_hour:2*one_hour-1]
+        temp_Z[2*TS_N_ELEMENTS-one_hour:2*TS_N_ELEMENTS-1] = tendency[0:one_hour-1]
+
+        for n,_ in enumerate(qday):
+            qday[n][key] = savgol_filter(temp_Z[TS_N_ELEMENTS:2*TS_N_ELEMENTS-1],minutes_for_smoothing,10)+tmp_median
+        
+        ##############################
+        # F-section 
+        key = 'F'
+        buff = numpy.ravel(vectorize(qday,key))
+        mask = buff > 999990
+        mask.astype(bool)
+        tmp_valid_indexes_count = numpy.count_nonzero(mask)
+        tmp_valid_indexes = numpy.where(mask)[0]
+
+        if tmp_valid_indexes_count <0 : raise ValueError("No hay data para calcular Quiet Day.")
+
+        tmp_median = numpy.median(vectorize(qday[tmp_valid_indexes],key))
+        #INTERPOL(y, x, xinterp)
+
+        x  = numpy.ravel(numpy.array([two_hour_arr[0:one_hour-Delta_time-1], two_hour_arr[one_hour+Delta_time:2*one_hour-1]]))
+        y  = numpy.ravel(numpy.array([temp_F[2*TS_N_ELEMENTS-one_hour:2*TS_N_ELEMENTS-1-Delta_time], temp_F[TS_N_ELEMENTS+Delta_time:TS_N_ELEMENTS+one_hour-1]]))
+        xest = two_hour_arr
+
+        f = interp1d(x,y,kind='cubic')
+        
+        tendency = f(xest)
+
+        temp_F[TS_N_ELEMENTS:TS_N_ELEMENTS+one_hour-1]     = tendency[one_hour:2*one_hour-1]
+        temp_F[2*TS_N_ELEMENTS-one_hour:2*TS_N_ELEMENTS-1] = tendency[0:one_hour-1]
+
+        for n,_ in enumerate(qday):
+            qday[n][key] = savgol_filter(temp_F[TS_N_ELEMENTS:2*TS_N_ELEMENTS-1],minutes_for_smoothing,10)+tmp_median
+        
+        #Hay un goto,jump
+
+        return qday 
+        
+        
+         
+
+
+
+
+
+
+
+ 
 
 
 
