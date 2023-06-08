@@ -214,12 +214,415 @@ class geomagixs (object):
             return None
     
 
-    def __fixing_datafile (file_date, **kwargs):
+    def __fixing_datafile (self,file_date, **kwargs):
 
         station = kwargs.get('station',None)
         verbose = kwargs.get('verbose',None)
 
+        initial_year = file_date.year
+        initial_month = file_date.month
+        initial_day = file_date.day
 
+        tmp_julday = JULDAY(file_date)
+
+        result = CALDAT(JULDAY(tmp_julday))
+        tmp_year = result.year
+        tmp_month = result.month
+        tmp_day = result.day
+
+
+        #############
+        cabecera = 18 
+
+        file_name = '{}{:4d}{:02d}{:02d}rK.min'.format(self.GMS[self.system['gms']]['code'],tmp_year,tmp_month,tmp_day)
+
+        file_name = os.path.join(self.system['datasource_dir'],self.GMS[self.system['gms']]['name'],file_name)
+
+        exists = os.path.isfile(file_name)
+
+        if not exists:
+            file_name = '{}{:4d}{:02d}{:02d}rmin.min'.format(self.GMS[self.system['gms']]['code'],tmp_year,tmp_month,tmp_day)
+            file_name = os.path.join(self.system['datasource_dir'],self.GMS[self.system['gms']]['name'],file_name)
+            exists = os.path.isfile(file_name)
+
+        if not exists:
+            if verbose:
+                print("Error extrayendo datos del directorio.")
+            return 
+        else:
+            print('Extrayendo data de {}'.format(os.path.basename(file_name)))
+
+            with open(file_name,'r') as f:
+
+                tmp_data = numpy.array(f.readlines(),dtype='object')
+                number_of_lines = tmp_data.shape[0]
+            
+
+        minutes_in_a_day = 60*24
+        hours_in_a_day = 24
+
+        if station == 'planetary':
+            final_file = numpy.empty(hours_in_a_day,dtype=float)
+            j_inicio = cabecera - 1
+
+            for i in range(hours_in_a_day) :
+                
+                diff = JULDAY(file_date)- JULDAY(datetime(initial_year,1,1)+relativedelta(days=-1))
+                chain = '{:4d}-{:02d}-{:02d} {:02d}:{:02d}:00.000{:03d}   {:4d}     {:4d}  {:5d}    {:5d}   {:5d}     {:5d}'
+                final_file [i] = chain.format(tmp_year,tmp_month,space(1),tmp_day,i,0,diff,999, 999, 999, 999, 9999, 9999)
+
+                if exists:
+                    for j in range(j_inicio,number_of_lines):
+                        if (tmp_data[j][11:16]==final_file[i][11:16]):
+                            string_tmp = tmp_data[j]
+                            final_file[i] = string_tmp
+
+                            j_inicio = j+1
+        
+        else:
+            final_file = numpy.empty(minutes_in_a_day, dtype='object')
+
+            j_inicio = cabecera -1
+
+            for i in range(minutes_in_a_day):
+                diff = JULDAY(file_date)- JULDAY(datetime(initial_year,1,1)+relativedelta(days=-1))
+                chain = '{:4d}-{:02d}-{:02d} {:02d}:{:02d}:00.000{:03d}      {:7.2f} {:9.2f} {:9.2f} {:9.2f}'
+                final_file[i] = chain.format(tmp_year,tmp_month,tmp_day,i//60,i mod 60 , diff,9999.00, 999999.00, 999999.00, 999999.00)
+
+                if exists: 
+
+                    for j in range(j_inicio,number_of_lines):
+                        if (tmp_data[j][11:16]==final_file[i][11:16]):
+                            final_file[i] = tmp_data[j]
+                            j_inicio = j+1
+        
+
+
+        output_datafile = '{}_{:4d}{:02d}{:02d}.dat'.format(self.GMS[self.system['gms']]['code'],tmp_year,tmp_month,tmp_day )
+
+        output_path = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'])
+
+        exist_dir = os.path.isdir(output_path)
+
+        if not exist_dir:
+            if verbose:
+                print("Error critico: Directorio del sistema perdido -> {}. Verificar el directorio.".format(output_path))
+            
+        output_datafile = os.path.join(output_path,output_datafile)
+
+        with open(output_datafile,'wb') as file:
+            if station == 'planetary':
+                file.writelines(final_file[:hours_in_a_day])
+            else:
+                file.writelines(final_file[:minutes_in_a_day])
+
+        
+        if verbose:
+            print("Guardando {}".format(output_datafile))
+
+
+        return 
+
+
+    def __cleaning_datafile(self,initial,**kwargs):
+        ############################################################
+        station = kwargs.get("station",None)
+        verbose = kwargs.get('verbose',False)
+        real_time = kwargs.get('real_time',False)
+        offset = kwargs.get('offset',None)
+
+        ############################################################
+        #numero de desviaciones standar que necesita un dato para ser 
+        # considerado como invalido 
+        sigma_criteria = 4
+        number_of_minutes = 10 
+
+        #######
+        initial_year = initial.year
+        initial_month = initial.month
+        initial_day = initial.day
+
+
+        minutes_per_day = 24*60
+
+        D_values = numpy.empty(minutes_per_day)
+        D_values.fill(9999)
+
+        H_values = numpy.empty(minutes_per_day)
+        H_values.fill(999999)
+
+        Z_values = numpy.empty(minutes_per_day)
+        Z_values.fill(999999)
+
+        F_values = numpy.empty(minutes_per_day)
+        F_values.fill(999999)
+
+        string_date = '{:4d}{:02d}{:02d}'.format(initial_year,initial_month,initial_day)
+
+        data_file_name = '{}_{}.dat'.format(self.GMS[self.system['gms']]['code'],string_date)
+
+        exist_data_file = os.path.isfile(data_file_name)
+
+        if station == 'planetary':
+            if exist_data_file:
+                if verbose:
+                    print("Extrayendo data de: {}.".format(os.path.basename(data_file_name)))
+                fpath = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],data_file_name)
+                
+                exists = os.path.isfile(fpath)
+
+                if not exists:
+                    if verbose:
+                        RuntimeWarning("Error critico: No se puede acceder al archivo {}".format(os.path.basename(fpath)))
+                    
+                    return
+                
+
+                with open(fpath,'r') as file:
+                    tmp_data = numpy.array(file.readlines(),dtype='object')
+                    number_of_lines = tmp_data.shape[0]
+                
+
+                output_datafile = '{}_{:4d}{:02d}{:02d}.clean.dat'.format(self.GMS[self.system['gms']]['code'],initial_year,initial_month,initial_day)
+                output_path = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'])
+
+
+                exist_dir = os.path.isdir(output_path)
+
+                if not exist_dir:
+                    if verbose:
+                        print("Error critico: Imposible leer el directorio del sistema {}.Archivos o directorios perdidos o se necesitan permisos.".format(output_path))
+
+                    return 
+                
+                output_datafile = os.path.join(output_path,output_datafile)
+
+                with open(output_datafile,'wb') as file:
+                    file.writelines(tmp_data[:number_of_lines])
+                
+                if verbose:
+                    print("Guardando : {}".format(os.path.basename(output_datafile)))
+
+                return 
+            else:
+                if verbose:
+                    print("Datafile {} no encontrado".format(os.path.basename(data_file_name)))
+                return 
+        
+        if exist_data_file:
+            tmp_data = self.__getting_magneticdata_forcleaning(initial,station=station,verbose=verbose)
+        
+        else:
+            if verbose:
+                Warning("Inconsistencia! El archivo se encuentra perdido, las condiciones solicitadas podría comprometer los resultados calculados.\
+                        Archivo {} no fue encontrado. Procediendo con valores predefinidos (gaps)".format(os.path.basename(data_file_name)))
+        
+
+        ######################################################################################3
+        if exist_data_file :
+            D_values  = deepcopy(vectorize(tmp_data,'D'))
+            H_values  = deepcopy(vectorize(tmp_data,'H'))
+            Z_values  = deepcopy(vectorize(tmp_data,'Z'))
+            F_values  = deepcopy(vectorize(tmp_data,'F'))
+        
+
+        ###
+        mask = H_values <= 999990
+        mask = mask.astype(bool)
+        no_gaps = numpy.where(mask)[0]
+        no_gaps_count = numpy.count_nonzero(mask)
+
+        ###
+        number_of_gaps = numpy.count_nonzero(~mask)
+
+        if no_gaps_count > 0 and offset.shape[0] == 3:
+
+            if offset[0]!=0 :
+                D_values[no_gaps] += offset[0]
+            if offset[1]!=0:
+                H_values[no_gaps] += offset[1]
+            if offset[2]!=0:
+                Z_values[no_gaps] += offset[2]
+            if offset[1]!=0 | offset[2]!=0 :
+
+                F_values[no_gaps] =numpy.sqrt((H_values[no_gaps])^2+(Z_values[no_gaps])^2)
+
+
+        H_median_value = 0
+        H_sigma_value = 0
+        F_median_value =0
+        F_sigma_value = 0
+
+        elements_of_no_gaps =no_gaps_count
+        boolean_flag = numpy.empty(elements_of_no_gaps)
+        boolean_flag.fill(1)
+
+        if exist_data_file is True and number_of_gaps != minutes_per_day:
+
+            for i  in range(elements_of_no_gaps):
+                if i< number_of_minutes and i+number_of_minutes < elements_of_no_gaps -1 :
+                    if i!=0:
+                        H_median_value = numpy.median(numpy.concatenate((H_values[no_gaps[:i-1]],H_values[no_gaps[i+1:i+1+number_of_minutes-1]])))
+                        H_sigma_value = numpy.std(numpy.concatenate((H_values[no_gaps[:i-1]],H_values[no_gaps[i+1:i+1+number_of_minutes-1]]))-H_median_value)
+
+                        F_median_value = numpy.median(numpy.concatenate((F_values[no_gaps[:i-1]],F_values[no_gaps[i+1:i+1+number_of_minutes-1]])))
+                        F_sigma_value = numpy.std(numpy.concatenate((F_values[no_gaps[:i-1]],F_values[no_gaps[i+1:i+1+number_of_minutes-1]]))-F_median_value)
+                    else:
+
+                        H_median_value = numpy.median(H_values[no_gaps[i+1:i+1+number_of_minutes]])
+                        H_sigma_value  = numpy.std(H_values[no_gaps[i+1:i+1+number_of_minutes]]-H_median_value)
+
+                        F_median_value = numpy.median(F_values[no_gaps[i+1:i+1+number_of_minutes]])
+                        F_sigma_value  = numpy.std(F_values[no_gaps[i+1:i+1+number_of_minutes]]-F_median_value)
+
+
+                if i < number_of_minutes and i + number_of_minutes > elements_of_no_gaps -1 :
+                    if i !=0 and i != elements_of_no_gaps -1 :
+                        H_median_value = numpy.median(numpy.concatenate((H_values[no_gaps[:i-1]],H_values[no_gaps[i+1:elements_of_no_gaps-1]])))
+                        H_sigma_value  = numpy.std(numpy.concatenate(H_values[no_gaps[0:i-1]],H_values[no_gaps[i+1:elements_of_no_gaps-1]])-H_median_value )
+
+                        F_median_value = numpy.median(numpy.concatenate((F_values[no_gaps[:i-1]],F_values[no_gaps[i+1:elements_of_no_gaps-1]])))
+                        F_sigma_value  = numpy.std(numpy.concatenate(F_values[no_gaps[0:i-1]],F_values[no_gaps[i+1:elements_of_no_gaps-1]])-F_median_value )
+                    
+                    if i == 0:
+
+                        H_median_value = numpy.median(H_values[no_gaps[i+1:elements_of_no_gaps-1]])
+                        H_sigma_value  = numpy.std(H_values[no_gaps[i+1:elements_of_no_gaps-1]]-H_median_value )
+
+                        F_median_value = numpy.median(F_values[no_gaps[i+1:elements_of_no_gaps-1]])))
+                        F_sigma_value  = numpy.std(F_values[no_gaps[i+1:elements_of_no_gaps-1]]-F_median_value )
+                    
+                    if i == elements_of_no_gaps-1:
+                        H_median_value = numpy.median(H_values[no_gaps[:elements_of_no_gaps-2]])
+                        H_sigma_value  = numpy.std(H_values[no_gaps[:elements_of_no_gaps-2]]-H_median_value)
+
+                        F_median_value = numpy.median(F_values[no_gaps[:elements_of_no_gaps-2]])
+                        F_median_value = numpy.median(F_values[no_gaps[:elements_of_no_gaps-2]]-F_median_value)
+
+
+                if i >= number_of_minutes and i + number_of_minutes <= elements_of_no_gaps -1:
+                    H_median_value = numpy.median(numpy.concatenate(H_values[no_gaps[i-number_of_minutes:i-1]], H_values[no_gaps[i+1:i+number_of_minutes]]))
+                    H_sigma_value = numpy.std(numpy.concatenate(H_values[no_gaps[i-number_of_minutes:i-1]], H_values[no_gaps[i+1:i+number_of_minutes]])-H_median_value)
+
+                    F_median_value = numpy.median(numpy.concatenate(F_values[no_gaps[i-number_of_minutes:i-1]], F_values[no_gaps[i+1:i+number_of_minutes]]))
+                    F_sigma_value  = numpy.std(numpy.concatenate(F_values[no_gaps[i-number_of_minutes:i-1]], F_values[no_gaps[i+1:i+number_of_minutes]])-F_median_value)
+
+                
+                if i >= number_of_minutes and i + number_of_minutes > elements_of_no_gaps -1 :
+                    if i == elements_of_no_gaps-1:
+                        H_median_value = numpy.median(H_values[no_gaps[i-number_of_minutes:elements_of_no_gaps-2]])
+                        H_sigma_value  = numpy.std(H_values[no_gaps[i-number_of_minutes:elements_of_no_gaps-2]]-H_median_value)
+
+                        F_median_value = numpy.median(F_values[no_gaps[i-number_of_minutes:elements_of_no_gaps-2]])
+                        F_sigma_value = numpy.std(F_values[no_gaps[i-number_of_minutes:elements_of_no_gaps-2]]-F_median_value)
+                    else:
+                        H_median_value = numpy.median(numpy.concatenate(H_values[no_gaps[i-number_of_minutes:i-1]], H_values[no_gaps[i+1:elements_of_no_gaps-1]]))
+                        H_sigma_value  = numpy.std(numpy.concatenate(H_values[no_gaps[i-number_of_minutes:i-1]], H_values[no_gaps[i+1:elements_of_no_gaps-1]])-H_median_value)
+
+                        F_median_value = numpy.median(numpy.concatenate(F_values[no_gaps[i-number_of_minutes:i-1]], F_values[no_gaps[i+1:elements_of_no_gaps-1]]))
+                        F_sigma_value  = numpy.std(numpy.concatenate(F_values[no_gaps[i-number_of_minutes:i-1]], F_values[no_gaps[i+1:elements_of_no_gaps-1]])-F_median_value)
+
+                    
+
+                    ###
+                if (numpy.abs(H_values[no_gaps[i]]-H_median_value)> sigma_criteria*H_sigma_value) or (numpy.abs(F_values[no_gaps[i]]-F_median_value))>sigma_criteria*F_sigma_value:
+                    boolean_flag[i]=0
+                
+
+                H_median_value = 0 
+                H_sigma_value = 0
+                F_median_value = 0
+                F_sigma_value = 0
+            
+            v1  = boolean_flag > 0 
+            v1 = v1.astype(int)
+
+            v2 = boolean_flag <1
+            v2 = v2.astype(int)
+
+            if elements_of_no_gaps > 1 :
+                
+                D_values [no_gaps] =  v1 * (D_values[no_gaps]) + (v2)*9999
+                H_values [no_gaps] =  v1 * (H_values[no_gaps]) + (v2)*9999
+                Z_values [no_gaps] =  v1 * (Z_values[no_gaps]) + (v2)*9999
+                F_values [no_gaps] =  v1 * (F_values[no_gaps]) + (v2)*999999
+
+            ##########################################
+            cleaning_count = 0
+            if no_gaps_count > 0 :
+                result = numpy.abs(H_values[no_gaps]-numpy.median(H_values[no_gaps]))/numpy.median(H_values[no_gaps])
+                result >= 0.005 
+
+                cleaning_indexes = numpy.where(result)[0]
+                cleaning_count = numpy.count_nonzero(cleaning_indexes)
+
+            else:
+                cleaning_count = -1 
+
+            if cleaning_count >0 :
+                D_values[cleaning_indexes] = 9999
+                H_values[cleaning_indexes] = 999999
+                Z_values[cleaning_indexes] = 999999
+                F_values[cleaning_indexes] = 999999
+
+            mask = H_values<999990
+            mask = mask.astype(bool)
+            new_no_gaps = numpy.where(mask)[0]
+            new_no_gaps_count = numpy.count_nonzero(new_no_gaps)
+
+
+
+            #############################################
+            #### Tener cuidado en esta seccion
+            #############################################
+            mask = H_values <= 999990
+            mask = mask.astype(bool)
+
+            bad_minutes_number = numpy.count_nonzero (mask)
+            bad_minutes_indexes = numpy.where(mask)[0]
+
+
+
+            mask = H_values > 999990
+            mask = mask.astype(bool)
+
+            good_minutes_number = numpy.count_nonzero (mask)
+            good_minutes_indexes = numpy.where(mask)[0]
+
+            total_minutes = H_values.shape[0]
+
+            criteria_up = .85
+            criteria_0 = .025
+            fixed_minutes = 0
+            
+
+            if (good_minutes_number > criteria_up*total_minutes) and (good_minutes_number<=total_minutes) and real_time is None:
+
+                tmp_D = deepcopy(D_values)
+                tmp_H = deepcopy(H_values)
+                tmp_Z = deepcopy(Z_values)
+                tmp_F = deepcopy(F_values)
+                tmp_t = vectorize(tmp_data,'hour')*60 + vectorize(tmp_data,'minute')
+
+                process_number = [1,2,3,4,6,8]
+
+                j = 0
+
+                while 1 :
+
+                    n_processes = process_number[j]
+                    delta_time = minutes_per_day//n_processes
+                    i=0 
+
+                    while 1: 
+                        low_limit = i*delta_time
+                        up_limit = (i+1)*delta_time-1 
+
+                        ##
+                        mask = H_values[low_limit:up_limit]
+                        bad_minutes_indexes = numpy.where()
+
+                
 
 
 
@@ -518,13 +921,13 @@ class geomagixs (object):
             flatten3 = numpy.array([data['max_k'] for data in data_qd])
           
             mask1 = flatten<990
-            mask1.astype(bool)
+            mask1 = mask1.astype(bool)
 
             mask2 = flatten2<990**2*8
-            mask2.astype(bool)
+            mask2 = mask2.astype(bool)
 
             mask3 = flatten3<999
-            mask3.astype(bool)
+            mask3 = mask3.astype(bool)
 
             mask = mask1 & mask2 & mask3
 
@@ -893,14 +1296,14 @@ class geomagixs (object):
             bool1 = vectorize(qday,'dH')
             bool2 = .5*vectorize(qday,'H')
             bool1 = bool1>0.05*bool2
-            bool1.astype(bool)
+            bool1 = bool1.astype(bool)
 
         
 
             bool3 = vectorize(qday,'dH')
             th = 4*numpy.median(vectorize(qday,'dH'))
             bool3 = bool3 > th
-            bool3.astype(bool)
+            bool3 = bool3.astype(bool)
 
             clean_indexes = bool1 & bool3
 
@@ -1162,10 +1565,10 @@ class geomagixs (object):
             
 
             bool1 = qd_data[i]['H'] < 999990.00
-            bool1.astype(bool)
+            bool1 = bool1.astype(bool)
 
             bool2 = qd_data[i]['H'] > 0 
-            bool2.astype(bool)
+            bool2 = bool2.astype(bool)
 
             mask = bool1 & bool2 
 
@@ -1230,7 +1633,7 @@ class geomagixs (object):
         temp_H [2*TS_N_ELEMENTS:] = numpy.ravel(vectorize(qday,'H'))
         
         mask = temp_H < 999990
-        mask.astype(bool)
+        mask = mask.astype(bool)
 
         tmp_valid_indexes_count = numpy.count_nonzero(mask)
         tmp_valid_indexes =  numpy.where(mask)[0]
@@ -1249,7 +1652,7 @@ class geomagixs (object):
         temp_D [2*TS_N_ELEMENTS:] = numpy.ravel(vectorize(qday,'D'))
         
         mask = temp_D < 999990
-        mask.astype(bool)
+        mask = mask.astype(bool)
 
         tmp_valid_indexes_count = numpy.count_nonzero(mask)
         tmp_valid_indexes =  numpy.where(mask)[0]
@@ -1269,7 +1672,7 @@ class geomagixs (object):
         temp_Z [2*TS_N_ELEMENTS:] = numpy.ravel(vectorize(qday,'Z'))
         
         mask = temp_Z < 999990
-        mask.astype(bool)
+        mask = mask.astype(bool)
 
         tmp_valid_indexes_count = numpy.count_nonzero(mask)
         tmp_valid_indexes =  numpy.where(mask)[0]
@@ -1289,7 +1692,7 @@ class geomagixs (object):
         temp_F [2*TS_N_ELEMENTS:] = numpy.ravel(vectorize(qday,'F'))
         
         mask = temp_F < 999990
-        mask.astype(bool)
+        mask = mask.astype(bool)
 
         tmp_valid_indexes_count = numpy.count_nonzero(mask)
         tmp_valid_indexes =  numpy.where(mask)[0]
@@ -1319,7 +1722,7 @@ class geomagixs (object):
             # H-section
             tmp_vector = temp_H[TS_N_ELEMENTS-one_hour+i*half_hour:TS_N_ELEMENTS+i*half_hour-1]
             mask = tmp_vector <999990.0
-            mask.astype(bool)
+            mask = mask.astype(bool)
 
 
             count = numpy.count_nonzero(mask)
@@ -1353,7 +1756,7 @@ class geomagixs (object):
 
             mask = numpy.abs(tmp_vector-tendency)>(median_value+deviation_criteria*deviation) 
 
-            mask.astype(bool)
+            mask = mask.astype(bool)
 
             bad_indexes_count = numpy.count_nonzero(mask)[0]
             bad_indexes = numpy.where(mask)[0]
@@ -1366,7 +1769,7 @@ class geomagixs (object):
             # D-section
             tmp_vector = temp_D[TS_N_ELEMENTS-one_hour+i*half_hour:TS_N_ELEMENTS+i*half_hour-1]
             mask = tmp_vector <999990.0
-            mask.astype(bool)
+            mask = mask.astype(bool)
 
 
             count = numpy.count_nonzero(mask)
@@ -1399,7 +1802,7 @@ class geomagixs (object):
 
             mask = numpy.abs(tmp_vector-tendency)>(median_value+deviation_criteria*deviation) 
 
-            mask.astype(bool)
+            mask = mask.astype(bool)
 
             bad_indexes_count = numpy.count_nonzero(mask)[0]
             bad_indexes = numpy.where(mask)[0]
@@ -1412,7 +1815,7 @@ class geomagixs (object):
             # Z-section
             tmp_vector = temp_Z[TS_N_ELEMENTS-one_hour+i*half_hour:TS_N_ELEMENTS+i*half_hour-1]
             mask = tmp_vector <999990.0
-            mask.astype(bool)
+            mask = mask.astype(bool)
 
 
             count = numpy.count_nonzero(mask)
@@ -1445,7 +1848,7 @@ class geomagixs (object):
 
             mask = numpy.abs(tmp_vector-tendency)>(median_value+deviation_criteria*deviation) 
 
-            mask.astype(bool)
+            mask = mask.astype(bool)
 
             bad_indexes_count = numpy.count_nonzero(mask)[0]
             bad_indexes = numpy.where(mask)[0]
@@ -1457,7 +1860,7 @@ class geomagixs (object):
             # F-section
             tmp_vector = temp_F[TS_N_ELEMENTS-one_hour+i*half_hour:TS_N_ELEMENTS+i*half_hour-1]
             mask = tmp_vector <999990.0
-            mask.astype(bool)
+            mask = mask.astype(bool)
 
 
             count = numpy.count_nonzero(mask)
@@ -1490,7 +1893,7 @@ class geomagixs (object):
 
             mask = numpy.abs(tmp_vector-tendency)>(median_value+deviation_criteria*deviation) 
 
-            mask.astype(bool)
+            mask = mask.astype(bool)
 
             bad_indexes_count = numpy.count_nonzero(mask)[0]
             bad_indexes = numpy.where(mask)[0]
@@ -1508,7 +1911,7 @@ class geomagixs (object):
         key = 'H'
         buff = numpy.ravel(vectorize(qday,key))
         mask = buff > 999990
-        mask.astype(bool)
+        mask = mask.astype(bool)
         tmp_valid_indexes_count = numpy.count_nonzero(mask)
         tmp_valid_indexes = numpy.where(mask)[0]
 
@@ -1537,7 +1940,7 @@ class geomagixs (object):
         key = 'D'
         buff = numpy.ravel(vectorize(qday,key))
         mask = buff > 999990
-        mask.astype(bool)
+        mask = mask.astype(bool)
         tmp_valid_indexes_count = numpy.count_nonzero(mask)
         tmp_valid_indexes = numpy.where(mask)[0]
 
@@ -1565,7 +1968,7 @@ class geomagixs (object):
         key = 'Z'
         buff = numpy.ravel(vectorize(qday,key))
         mask = buff > 999990
-        mask.astype(bool)
+        mask = mask.astype(bool)
         tmp_valid_indexes_count = numpy.count_nonzero(mask)
         tmp_valid_indexes = numpy.where(mask)[0]
 
@@ -1593,7 +1996,7 @@ class geomagixs (object):
         key = 'Z'
         buff = numpy.ravel(vectorize(qday,key))
         mask = buff > 999990
-        mask.astype(bool)
+        mask = mask.astype(bool)
         tmp_valid_indexes_count = numpy.count_nonzero(mask)
         tmp_valid_indexes = numpy.where(mask)[0]
 
@@ -1621,7 +2024,7 @@ class geomagixs (object):
         key = 'F'
         buff = numpy.ravel(vectorize(qday,key))
         mask = buff > 999990
-        mask.astype(bool)
+        mask = mask.astype(bool)
         tmp_valid_indexes_count = numpy.count_nonzero(mask)
         tmp_valid_indexes = numpy.where(mask)[0]
 
