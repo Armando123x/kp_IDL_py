@@ -540,95 +540,377 @@ class geomagixs (object):
             v2 = boolean_flag <1
             v2 = v2.astype(int)
 
-            if elements_of_no_gaps > 1 :
-                
-                D_values [no_gaps] =  v1 * (D_values[no_gaps]) + (v2)*9999
-                H_values [no_gaps] =  v1 * (H_values[no_gaps]) + (v2)*9999
-                Z_values [no_gaps] =  v1 * (Z_values[no_gaps]) + (v2)*9999
-                F_values [no_gaps] =  v1 * (F_values[no_gaps]) + (v2)*999999
+        if elements_of_no_gaps > 1 :
+            
+            D_values [no_gaps] =  v1 * (D_values[no_gaps]) + (v2)*9999
+            H_values [no_gaps] =  v1 * (H_values[no_gaps]) + (v2)*9999
+            Z_values [no_gaps] =  v1 * (Z_values[no_gaps]) + (v2)*9999
+            F_values [no_gaps] =  v1 * (F_values[no_gaps]) + (v2)*999999
 
-            ##########################################
-            cleaning_count = 0
-            if no_gaps_count > 0 :
-                result = numpy.abs(H_values[no_gaps]-numpy.median(H_values[no_gaps]))/numpy.median(H_values[no_gaps])
-                result >= 0.005 
+        ##########################################
+        cleaning_count = 0
+        if no_gaps_count > 0 :
+            result = numpy.abs(H_values[no_gaps]-numpy.median(H_values[no_gaps]))/numpy.median(H_values[no_gaps])
+            result >= 0.005 
 
-                cleaning_indexes = numpy.where(result)[0]
-                cleaning_count = numpy.count_nonzero(cleaning_indexes)
+            cleaning_indexes = numpy.where(result)[0]
+            cleaning_count = numpy.count_nonzero(cleaning_indexes)
 
-            else:
-                cleaning_count = -1 
+        else:
+            cleaning_count = -1 
 
-            if cleaning_count >0 :
-                D_values[cleaning_indexes] = 9999
-                H_values[cleaning_indexes] = 999999
-                Z_values[cleaning_indexes] = 999999
-                F_values[cleaning_indexes] = 999999
+        if cleaning_count >0 :
+            D_values[cleaning_indexes] = 9999
+            H_values[cleaning_indexes] = 999999
+            Z_values[cleaning_indexes] = 999999
+            F_values[cleaning_indexes] = 999999
 
-            mask = H_values<999990
-            mask = mask.astype(bool)
-            new_no_gaps = numpy.where(mask)[0]
-            new_no_gaps_count = numpy.count_nonzero(new_no_gaps)
-
-
-
-            #############################################
-            #### Tener cuidado en esta seccion
-            #############################################
-            mask = H_values <= 999990
-            mask = mask.astype(bool)
-
-            bad_minutes_number = numpy.count_nonzero (mask)
-            bad_minutes_indexes = numpy.where(mask)[0]
+        mask = H_values<999990
+        mask = mask.astype(bool)
+        new_no_gaps = numpy.where(mask)[0]
+        new_no_gaps_count = numpy.count_nonzero(new_no_gaps)
 
 
 
-            mask = H_values > 999990
-            mask = mask.astype(bool)
+        #############################################
+        #### Tener cuidado en esta seccion
+        #############################################
+        mask = H_values <= 999990
+        mask = mask.astype(bool)
 
-            good_minutes_number = numpy.count_nonzero (mask)
-            good_minutes_indexes = numpy.where(mask)[0]
+        bad_minutes_number = numpy.count_nonzero (mask)
+        bad_minutes_indexes = numpy.where(mask)[0]
 
-            total_minutes = H_values.shape[0]
 
-            criteria_up = .85
-            criteria_0 = .025
-            fixed_minutes = 0
+
+        mask = H_values > 999990
+        mask = mask.astype(bool)
+
+        good_minutes_number = numpy.count_nonzero (mask)
+        good_minutes_indexes = numpy.where(mask)[0]
+
+        total_minutes = H_values.shape[0]
+
+        criteria_up = .85
+        criteria_0 = .025
+        fixed_minutes = 0
+        
+
+        if (good_minutes_number > criteria_up*total_minutes) and (good_minutes_number<=total_minutes) and real_time is None:
+
+            tmp_D = deepcopy(D_values)
+            tmp_H = deepcopy(H_values)
+            tmp_Z = deepcopy(Z_values)
+            tmp_F = deepcopy(F_values)
+            tmp_t = vectorize(tmp_data,'hour')*60 + vectorize(tmp_data,'minute')
+
+            process_number = [1,2,3,4,6,8]
+
+            j = 0
+
+            while 1 :
+
+                n_processes = process_number[j]
+                delta_time = minutes_per_day//n_processes
+                i=0 
+
+                while 1: 
+                    low_limit = i*delta_time
+                    up_limit = (i+1)*delta_time-1 
+
+                    ##
+                    mask1 = H_values[low_limit:up_limit] >= 999990
+                    mask2 = H_values[low_limit:up_limit] < 999990
+
+                    bad_minutes_indexes = numpy.array(numpy.where(mask1)[0])
+                    good_minutes_indexes = numpy.array(numpy.where(mask2)[0])
+
+                    bad_minutes_number = numpy.count_nonzero(mask1)
+                    good_minutes_number = numpy.count_nonzero(mask2)
+
+                    if bad_minutes_number > 0 and bad_minutes_number < n_processes*criteria_0*good_minutes_number:
+
+                        #INTERPOL(y, x, xinterp)
+
+                        tmp= interp1d(tmp_t[low_limit+good_minutes_indexes],H_values[low_limit+good_minutes_indexes],kind='cubic')
+                        tmp_H = tmp(tmp_t)
+                        H_values [low_limit+bad_minutes_indexes] = tmp_H[low_limit+bad_minutes_indexes]
+
+                        tmp= interp1d(tmp_t[low_limit+good_minutes_indexes],D_values[low_limit+good_minutes_indexes],kind='cubic')
+                        tmp_D = tmp(tmp_t)
+                        D_values [low_limit+bad_minutes_indexes] = tmp_D[low_limit+bad_minutes_indexes]
+
+                        tmp= interp1d(tmp_t[low_limit+good_minutes_indexes],Z_values[low_limit+good_minutes_indexes],kind='cubic')
+                        tmp_Z = tmp(tmp_t)
+                        Z_values [low_limit+bad_minutes_indexes] = tmp_Z[low_limit+bad_minutes_indexes]
+
+
+                        tmp= interp1d(tmp_t[low_limit+good_minutes_indexes],F_values[low_limit+good_minutes_indexes],kind='cubic')
+                        tmp_F = tmp(tmp_t)
+                        F_values [low_limit+bad_minutes_indexes] = tmp_F[low_limit+bad_minutes_indexes]
+
+                        fixed_minutes = fixed_minutes + bad_minutes_number
+                    
+                    mask = H_values >= 999990
+                    mask = mask.astype(bool)
+
+                    bad_minutes_indexes = numpy.where(mask)[0]
+                    bad_minutes_number = numpy.count_nonzero(mask)
+
+                    i+=1
+
+                    if (bad_minutes_number<=0) or (i >= n_processes): break
+                j=j+1
+
+                if (bad_minutes_number<=0) or (j >= process_number.shape[0]):break
+
+        #preparing data for storing
+        # 
+        # 
+        #     
+        data_file = numpy.array(minutes_per_day,dtype='object')
+
+        for i in range(minutes_per_day):
+            chain = '{:4d}-{:02d}-{:02d} {:02d}:{:02d}:00.000 {:03d}     {:7.2f} {:9.2f} {:9.2f} {:9.2f}'
+
+            data_file[i] = chain.format(tmp_data[i]['year'],tmp_data[i]['month'],tmp_data[i]['day'],
+                                        tmp_data[i]['hour'],tmp_data[i]['minute'],tmp_data[i]['doy'],
+                                        D_values[i],H_values[i],Z_values[i],F_values[i])
             
 
-            if (good_minutes_number > criteria_up*total_minutes) and (good_minutes_number<=total_minutes) and real_time is None:
 
-                tmp_D = deepcopy(D_values)
-                tmp_H = deepcopy(H_values)
-                tmp_Z = deepcopy(Z_values)
-                tmp_F = deepcopy(F_values)
-                tmp_t = vectorize(tmp_data,'hour')*60 + vectorize(tmp_data,'minute')
-
-                process_number = [1,2,3,4,6,8]
-
-                j = 0
-
-                while 1 :
-
-                    n_processes = process_number[j]
-                    delta_time = minutes_per_day//n_processes
-                    i=0 
-
-                    while 1: 
-                        low_limit = i*delta_time
-                        up_limit = (i+1)*delta_time-1 
-
-                        ##
-                        mask = H_values[low_limit:up_limit]
-                        bad_minutes_indexes = numpy.where()
-
-                
+        output_path = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'])
 
 
+        cleaned_data_file_name = '{}_{}.clean.dat'.format(self.GMS[self.system['gms']]['code'],string_date)
 
+        fpath = os.path.join(output_path,cleaned_data_file_name)
+        with open(fpath, 'wb') as file:
+            file.writelines(data_file)
 
+        if verbose:
+            print("Guardando: {}".format(os.path.basename(fpath)))
+            if offset.shape[0] == 3:
+                print("Con datos-offset de {:4d} en D, {:4d} en H y {:4d} en Z".format(offset[0],offset[1],offset[2]))
 
+            if (new_no_gaps_count   < minutes_per_day): 
+                diff = numpy.abs(minutes_per_day-new_no_gaps_count)
+                print("El archivo original tuvo perdido {:4d} minutos de datos.".format(diff))
+            if (new_no_gaps_count<no_gaps_count):
+                diff = numpy.abs(no_gaps_count-new_no_gaps_count)
+                print("Adicionalmente {:4d} minutos de original data fueron descartados".format(diff))
+            if (fixed_minutes > 0 ):
+                print("Finalmente, {} minutos de la data original se pudo interpolar".format(fixed_minutes))
     
+        return 
+    def __fixing_voltagefile(self,file_date,**kwargs):
+        station = kwargs.get("station",None)
+        verbose = kwargs.get('verbose',False)
+
+        '''
+        La funcion tiene como propositio en completar vacios 
+        en archivos raw del REGMEX GMS y remover las cabezas
+        o headers 
+        '''
+
+        initial_year = file_date.year
+        initial_month = file_date.month
+        initial_day = file_date.day
+
+        #######
+        # Reading data files 
+ 
+        tmp_julday = JULDAY(file_date)
+
+        result = CALDAT(tmp_julday)
+        tmp_year, tmp_month,tmp_day = result.year,result.month,result.day
+
+        cabecera = 18 
+
+        file_name = '{}{:4d}{:02d}{:02d}rK.min'.format(self.GMS[self.system['gms']],tmp_year,tmp_month,tmp_day)
+
+        fpath = os.path.join(self.system['datasource_dir'],self.GMS[self.system['gms']]['name'],file_name)
+
+        exists = os.path.isfile(fpath)
+
+        if not exists:
+
+            chain = '{}{:4d}{:02d}{:02d}rmin.min'
+            file_name = chain.format(self.GMS[self.system['gms']]['code'],tmp_year,tmp_month,tmp_day) 
+            
+            exists = os.path.isfile(file_name)
+
+            if exists:
+                if verbose:
+                    print("Extrayendo datos de {}".format(os.path.basename(file_name)))
+                fpath = os.path.join(self.system['datasource_dir'],self.GMS[self.system['gms']]['name'],file_name)
+                with open(fpath,'w') as file:
+                    tmp_data = file.readlines()
+                
+                    tmp_data = numpy.array(tmp_data,dtype='object')
+                    number_of_lines = tmp_data.shape[0]
+            else:
+                if verbose:
+                    print("Archivo no encontrado.")
+        else:
+            if verbose:
+                print("Extrayendo datos de {}".format(os.path.basename(file_name)))
+               
+            fpath = os.path.join(self.system['datasource_dir'],self.GMS[self.system['gms']]['name'],file_name)
+            with open(fpath,'w') as file:
+                tmp_data = file.readlines()
+            
+                tmp_data = numpy.array(tmp_data,dtype='object')
+
+                number_of_lines = tmp_data.shape[0]
+        
+        minutes_in_a_day  = 1440 
+        hours_in_a_day = 24
+
+        if station=='planetary':
+            final_file = numpy.array(hours_in_a_day,dtype='object')
+            j_inicio = cabecera-1
+
+            for i in range(hours_in_a_day):
+                result =  JULDAY(datetime(initial_year,initial_month,initial_day))-(JULDAY(datetime(initial_year,1,0)+relativedelta(days=-1)))
+                chain = '{:4d}-{:02d}-{:02d} {:02d}:{:02d}:00.000 {:03d}   {:4d}     {:4d}  {:5d}    {:5d}   {:5d}     {:5d}'
+                final_file [i]  =  chain.format(tmp_year, tmp_month,tmp_day,i,0,result,999,999,999,999,9999,9999)
+
+                if exists:
+                    j=j_inicio
+                    while(j<number_of_lines):
+                        if (tmp_data[j][11:16].lower()) == (final_file[i][11:16]):
+                            final_file[i] = tmp_data[j]
+                            j_inicio = j+1
+                            break
+
+                        j=j+1
+                    
+            
+        else:
+
+            final_file = numpy.array(minutes_in_a_day,dtype='object')
+            j_inicio = cabecera-1 
+            for i in range(minutes_in_a_day):
+                result =  JULDAY(datetime(initial_year,initial_month,initial_day))-(JULDAY(datetime(initial_year,1,0)+relativedelta(days=-1)))
+                chain = '{:4d}-{:02d}-{:02d} {:02d}:{:02d}:00.000 {:03d}     {:7.2f} {:9.2f} {:9.2f}'
+                final_file[i] = chain.format(tmp_year,tmp_month,tmp_day, i//60,i%60,result, 9999.00, 999999.00, 999999.00, 999999.00)
+
+                if exists:
+                    j= j_inicio
+                    while(j<number_of_lines):
+                        if (tmp_data[j][11:16].lower()==final_file[i][11:16].lower()):
+
+                            final_file[i] = tmp_data[j]
+
+                            j_inicio = j+1
+                            break
+                        
+                        j+=1
+
+
+        #### Creando archivo de datos
+        ##############################################################
+        output_datafile = '{}_{:4d}{:02d}{:02d}.dat'.format(self.GMS[self.system['gms']]['code'],tmp_year,tmp_month,tmp_day) 
+        opath = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'])
+
+        exists_dir = os.path.isdir(opath)
+
+        if not exists_dir:
+            if verbose:
+                print("Error critico: Directorio del sistema perdido {}. Revisa el directorio.".format(opath))
+                return 
+
+        fpath = os.path.join(opath,output_datafile)
+        with open(fpath,'w') as file:
+            file.writelines(final_file)
+        
+        if verbose:
+            print("Guardando {}").format( os.path.basename(opath))
+        
+        return 
+    
+
+
+    def __magneticdata_prepare(self, initial= None,final=None,**kwargs):
+
+        station = kwargs.get("station",None)
+        verbose = kwargs.get('verbose',False)
+        real_time = kwargs.get('real_time',False)
+        force_all = kwargs.get("force_all",False)
+        offset = kwargs.get(force_all,'None')
+
+        if offset is not None and isinstance(offset,list):
+            offset = numpy.array(offset)
+        
+        if offset is not None and isinstance(offset,numpy.ndarray)
+
+            if offset.shape[0] !=3:
+                raise ValueError("Valores inconsistentes o invalidos para el atributo OFFSET")
+        
+        if initial is None:
+            initial = self.system['today_date']
+        if final is None: 
+            final = initial 
+        check_dates(initial=initial,final=final,GMS=self.GMS,system=self.system,verbose=verbose)
+
+        
+        initial_year = initial.year
+        initial_month = initial.month
+        initial_day = initial.day
+
+        final_year = final.year
+        final_month = final.month
+        final_day = final.day 
+
+        ######
+        # Leyendo data files 
+
+        file_number = JULDAY(final)-JULDAY(initial)+1
+        data_file_name = numpy.empty(file_number,dtype='object')
+        processed_file_name = numpy.empty(file_number,dtype='object')
+        string_date = numpy.empty(file_number,dtype='object')
+
+        for i in range(file_number):
+            
+            tmp = JULDAY(initial)
+            result = CALDAT(tmp+i)
+            tmp_year = result.year
+            tmp_month = result.month
+            tmp_day = result.day        
+            string_date[i] = "{:4d}{:02d}{:02d}".format(tmp_year,tmp_month,tmp_day)
+
+            data_file_name [i] = '{}{}rk.min'.format(self.GMS[self.system['gms']]['code'],string_date[i])
+            processed_file_name[i] = "{}_{}.dat".format(self.GMS[self.system['gms']]['code'],string_date[i])
+ 
+        exist_processed_file =  [os.path.isfile( os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],path) ) and not force_all for path in processed_file_name]    
+        exist_processed_file = numpy.array(exist_processed_file)
+        
+        exist_data_file =  [os.path.isfile( os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],path) ) for path in data_file_name]    
+        exist_data_file = numpy.array(exist_data_file)
+
+        if len(numpy.where(exist_processed_file==0)[0]) >1 :updating_files = len(numpy.where(exist_processed_file==0)[0])
+        elif (0 in numpy.where(exist_processed_file==0)[0]):updating_files = len(numpy.where(exist_processed_file==0)[0])
+        else: updating_files=0
+
+        if verbose: 
+            if updating_files > 0:
+                print("Un total de {} archivos necesitan ser actualizados.".format(updating_files))
+                print("Puede usar el comando /FORCE_ALL para forzar la actualización.")
+            
+            else:
+                print("No hay archivo que requiera ser actualizado.")
+            
+            if updating_files != exist_data_file.shape[0]:
+                print("Hay todavia {} archivo(s) que pueden ser actualizados.".format(exist_processed_file.shape[0]-updating_files))
+                print("Use el comando /FORCE_ALL para forzar la actualización a todos los archivos.")
+        
+        proceed = True 
+
+
+        for i = 0 in range(exist_processed_file)
+#GEOMAGIXS MAGNETICDATA_PREPARE.PRO 
+asSSAD
     def __quietday_get(self,initial,station,verbose=False,real_time=False,force_all=False,local=None,statistic_qd=False):
         #script geomagix_quietday_get
         #        @geomagixs_commons
