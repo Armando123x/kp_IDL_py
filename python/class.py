@@ -108,6 +108,8 @@ class geomagixs (object):
 
 
             verbose= kwargs.get('verbose',False)
+            force_all = kwargs.get('force_all',False)
+            real_time = kwargs.get('real_time',False)
 
             initial_date = kwargs.get('initial_date',None)
             final_date = kwargs.get('final_date',False)
@@ -144,11 +146,17 @@ class geomagixs (object):
             station = self.GMS[self.system['gms']]['name']
             
 
-            #########################################3
+            #########################################
+            ### Actualizando archivos 
             self.__quietdays_download(initial_date,final_date,**kwargs)
             self.__magneticdata_download(date_initial=initial_date,date_final=final_date,verbose=verbose,station=station)
-            #self.__magneticdata_prep
+            self.__magneticdata_prepare(initial_date,final_date,station=self.GMS[self.system['gms']]['name'],force_all=force_all)
+            self.__magneticdata_process(initial_date,final_date,station=self.GMS[self.system['gms']]['name'],force_all=force_all,real_time=real_time)
 
+            #################################################
+            # CARGANDO DATOS
+
+            self.__ge
 
  
         #script -> geomagixs_quietdays_download.pro
@@ -163,6 +171,103 @@ class geomagixs (object):
         except:
 
             raise AttributeError("Algo salio mal en el inicio del programa.")
+
+    def __getting_deltab(self,initial,**kwargs):
+
+        verbose = kwargs.get('verbose',False)
+        real_time = kwargs.get('real_time',False)
+
+        initial_year = initial.year
+        initial_month = initial.month
+        initial_day = initial.day
+
+        keys = ['hour','Max_D','Min_D','sigma_D','delta_D','Max_H','Min_H','sigma_H','delta_H',
+                'Max_Z','Min_Z','sigma_Z','delta_Z','Max_F','Min_F','sigma_F','delta_F','Max_N','Min_N',
+                'sigma_N','delta_N']
+
+        struct = dict.fromkeys(keys,0)
+
+        hour = [0,3,6,9,12,15,18,21]
+
+        read_data = numpy.empty(8,dtype='objects')
+        read_data.fill(struct)
+
+        for n,_ in enumerate(read_data):
+            for key in keys:   
+
+                if key =='hour':  
+                    read_data[n][key]  = hour[n]
+                elif key in ['Max_D','Min_D','sigma_D','delta_D']:
+                    read_data[n][key] = 9999
+                else:
+                    read_data[n][key] = 999999
+
+        file_kind = 'early' if real_time else 'final'
+
+        file_name = '{}_{:4d}{:02d}{:02d}.differences{}'.format(self.GMS[self.system['gms']]['code'],initial_year, initial_month, initial_day,file_kind)
+
+        fpath = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],file_name)
+
+        exists = os.path.exists(fpath)
+
+        if exists is True:
+
+            with open(fpath,'r') as file:
+                magnetic_data = file.readlines()
+                magnetic_data = numpy.array(magnetic_data,dtype='object')
+                
+
+                for n,linea in enumerate(magnetic_data):
+                    valores = re.findall(r'\d+\.?\d*', linea)
+
+                        # Convertir los valores a enteros o números de punto flotante según corresponda
+                    valores = [int(v) if v.isdigit() else float(v) for v in valores]
+                    
+                    for key,valor in zip(keys,valor):
+                        read_data[n][key] = valor
+        
+        result = dict.fromkeys(keys,0)
+
+        for key in result.keys():
+            result[key] = vectorize(read_data,key)
+
+
+        return result 
+
+                    
+                
+    def __getting_deltah(self,initial,**kwargs):
+
+        verbose = kwargs.get('verbose',False)
+        real_time = kwargs.get('real_time',False)
+
+        initial_year = initial.year
+        initial_month = initial.month
+        initial_day = initial.day
+
+        struct = {'hour':0,'minute':0,'sigma_H':0,'d_H':0}
+
+        minutes_per_day = 1440
+        
+        read_data = numpy.empty(minutes_per_day,dtype='object')
+
+        read_data.fill(struct)
+
+        for n,_ in enumerate(read_data):
+            for key in ['d_H','sigma_H']:
+                read_data[n][key] = 999999
+
+        file_kind = '.early' if real_time else '.final'
+
+        file_name = '{}_{:4d}{:02d}{:02d}.data{}'.format(self.GMS[self.system['gms']]['code'],initial_year,initial_month,initial_day,file_kind)
+
+        fpath = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],file_name)
+
+        exists = os.path.isfile(fpath)
+        
+
+
+
 
 
 
@@ -703,6 +808,8 @@ class geomagixs (object):
                 print("Finalmente, {} minutos de la data original se pudo interpolar".format(fixed_minutes))
     
         return 
+    
+
     def __fixing_voltagefile(self,file_date,**kwargs):
         station = kwargs.get("station",None)
         verbose = kwargs.get('verbose',False)
@@ -908,9 +1015,24 @@ class geomagixs (object):
         proceed = True 
 
 
-        for i = 0 in range(exist_processed_file)
-#GEOMAGIXS MAGNETICDATA_PREPARE.PRO 
-asSSAD
+        for i in range(exist_processed_file):
+            if exist_processed_file[i] == 0:
+
+                valores = re.findall(r'\d+\.?\d*', string_date[i])
+
+                valores = numpy.array([int(v) if v.isdigit() else float(v) for v in valores])
+       
+                tmp_year, tmp_month,tmp_day = valores[0],valores[1],valores[2]
+
+                self.__fixing_datafile(datetime(tmp_year,tmp_month,tmp_day),verbose= verbose,station=station)
+                self.__cleaning_datafile(datetime(tmp_year,tmp_month,tmp_day),verbose=verbose,
+                                         station=station,offset=offset, real_time=real_time)
+        
+        if verbose:
+            print("Archivos listos para calcular!")
+        return 
+    
+
     def __quietday_get(self,initial,station,verbose=False,real_time=False,force_all=False,local=None,statistic_qd=False):
         #script geomagix_quietday_get
         #        @geomagixs_commons
@@ -989,10 +1111,13 @@ asSSAD
 
 
         return qday     
-    def __getting_magneticdata(self,initial,station=None,verbose=None):
+    def __getting_magneticdata(self,initial,**kwargs):
         # script geomagixs_quietday_get.pro
         #listo 
         try:
+            
+            verbose = kwargs.get('verbose',False)
+            station = kwargs.get('station',None)
 
             initial_year = initial.year
             initial_month = initial.month
@@ -2355,13 +2480,211 @@ asSSAD
 
 
 
+    def __making_processedplanetarydatafiles(self,initial,**kwargs):
+        station = kwargs.get('station',None)
+        verbose = kwargs.get('verbose',False)
+        real_time = kwargs.get("real_time",False)
 
- 
-    def __making_processeddatafiles(self,initial,station=None
-                                    ,verbose=None,real_time=None,tendency_days=None
-                                    ,statistic_qd=None):
+        initial_year = initial.year
+        initial_month = initial.month
+        initial_day  = initial.day
+
+        string_date = '{:4d}{:02d}{:02d}'.format(initial_year,initial_month,initial_day)
+
+        kmex_file_name = '{}_{}.clean.dat'.format(self.GMS[self.system['gms']]['code'],string_date)
+
+        kmex_file_path = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],kmex_file_name)
+
+        exist_kmex_file = os.path.isfile(kmex_file_path)
+
+
+        if exist_kmex_file:
+            
+            with open(exist_kmex_file,'r') as file:
+                tmp_data = file.readlines()
+                tmp_data = numpy.array(tmp_data,dtype='object')
+                number_of_lines = tmp_data.shape[0]
+            
+
+                keys = ['kp','total_kp','Ap','average_Ap','dst','average_dst']
+                str_tmp = dict.fromkeys(keys,0)
+
+                index_data = numpy.empty(number_of_lines,dtype='object')
+                index_data.fill(str_tmp)
+
+                for n,linea in enumerate(number_of_lines):
+
+                    valores = re.findall(r'\d+\.?\d*', linea)
+
+                    # Convertir los valores a enteros o números de punto flotante según corresponda
+                    valores = [int(v) if v.isdigit() else float(v) for v in valores]
+                    for valor,key in zip(valores,keys):
+                        index_data[n][key] = valor
+        else:
+
+            if verbose:
+                raise FileNotFoundError("Imposible leer los datos del archivo {}. Archivos perdidos.".format(kmex_file_name))
+            return  
+        
+        if verbose:
+            print("Reuniendo datos de la fecha: {:04d}/{:02d}/{:02d}".format(initial_year,initial_month,initial_day))
+        
+        file_data = numpy.empty(24,dtype='object')
+        file_differences = numpy.empty(8,dtype='object')
+
+        for i in range (24):
+            chain = '{:03d} {:02d}:{:02d}   {:5d}   {:5d}'
+            file_data[i] = chain.format(i,i,0,index_data[i]['dst'],index_data[i]['average_dst'])
+        
+        for i in range(8):
+            chain = '{:02d}   {:4d}   {:4d}   {:5d}   {:5d}'
+            file_differences[i] = chain.format(i*3,index_data[i*3]['kp'],index_data[i*3]['total_kp'],index_data[i*3]['kp'],index_data[i*3]['average_Ap'])
+
+        extention = ''
+        output_file = '{}_{:4d}{:02d}{:02d}'.format(self.GMS[self.system['gms']]['code'],initial_year,initial_month,initial_day)
+
+        output_path = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'])
+
+        exist_dir = os.path.isdir(output_path)
+
+        if not exist_dir:
+            if verbose:
+                raise NotADirectoryError("Error critico: Directorio perdido {}. Revisa el directorio.".format(output_path))
+            return
+
+        fpath = os.path.join(output_path,output_file+'.data'+extention)
+
+        with open(fpath,'w') as file:
+            file.writelines(file_data)
+        if verbose:
+            print("Guardando {}".format(os.path.basename(fpath)))
+        fpath = os.path.join(output_path,output_file+'.differences'+extention)
+
+        with open(fpath,'w') as file:
+            file.writelines(file_data)        
+        if verbose:
+            print("Guardando {}".format(os.path.basename(fpath)))
+
+        return        
+
+
+    def __magneticdata_process(self,initial,final,**kwargs):
+        '''
+        Secuencia principal
+        
+        script -> geomagixs_magneticdata_process.pro
+        '''
+        
+        station = kwargs.get('station',None)
+        verbose = kwargs.get('verbose',None)
+        force_all = kwargs.get('force_all',False)
+        statistic_qd = kwargs.get('statistic_qd',None)
+        real_time = kwargs.get('real_time',False)
+        #################################################################
+        ###############################################################################3
+
+        # inicializamos fecha y hora
+
+        initial_year = initial.year
+        initial_month = initial.month
+        initial_day = initial.day
+
+        final_year = final.year
+        final_month = final.month
+        final_day  = final.day
+
+        ###### Leyendo archivo de datos 
+
+        file_number = (JULDAY(final)-JULDAY(initial))+1
+
+        data_file_name = numpy.empty(file_number,dtype='object')
+
+        string_date = numpy.empty(file_number,dtype='object')
+
+        extention = '.early' if real_time else '.final'
+
+        tmp_julday = JULDAY(initial)
+
+        for i in range(file_number):
+
+            result = CALDAT(tmp_julday+i)
+            tmp_year,tmp_month,tmp_day = result.year,result.month,result.day
+
+            string_date[i]  = '{:4d}{:02d}{:02d}'.format(tmp_year,tmp_month,tmp_day)
+            data_file_name[i] = '{}_{}.clean.dat'.format(self.GMS[self.system['gms']]['code'],string_date[i])
+
+        fpath = numpy.array([os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],file) for file in data_file_name],dtype='object')
+
+        exist_data_file = [os.path.isfile(path) for path in fpath]
+        exist_data_file = numpy.array(exist_data_file,dtype='object')
+
+        capable_to_update = len(numpy.where(exist_data_file==True)[0])
+
+        if verbose:
+            if capable_to_update <1 :
+                print("Data files Error: No hay archivos con el formato GMS_YYYYMMDD.clean.dat")
+                print("La data será asumido con valores vacios")
+            
+        
+        exist_result_file = [os.path.isfile(os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],'{}_{}.data{}'.format(self.GMS[self.system['gms']]['code'],date,extention))) and not force_all for date in string_date]
+        make_update_file = exist_data_file and ~exist_result_file
+
+
+        total = numpy.count_nonzero(make_update_file)
+
+        if total >0:
+            files_to_update = len(numpy.where(make_update_file==True)[0])
+        else:
+            files_to_update = 0
+        
+        if verbose:
+            if  files_to_update >0:
+                print("Un total de {} archivos necesitan ser actualizados")
+            else:
+                print("Ningún archivo será actualizado")
+            
+            if capable_to_update > files_to_update:
+                print(" Hay todavia {} archivos que pueden ser actualizados.\
+                      Use el comando \FORCE ALL para forzar la actualización de todos los archivos.")
+                
+
+        # procediendo a actualizar
+
+        for i,element in enumerate(make_update_file):
+
+            if make_update_file [i] ==True:
+                tmp_year = string_date[i][:4]
+                tmp_month = string_date[i][4:6]
+                tmp_day = string_date[i][6:]
+
+                tmp_year = int(tmp_year)
+                tmp_month = int(tmp_month)
+                tmp_day = int(tmp_day)
+
+                date = datetime(tmp_year,tmp_month,tmp_day)
+
+
+                if station != 'planetary' : 
+                    self.__making_processeddatafiles(date,verbose=verbose,station=station,real_time=real_time,statistic_qd=statistic_qd)
+                else:
+                    self.__making_processedplanetarydatafiles(date,verbose=verbose,station=station,real_time = real_time)
+
+
+        if verbose:
+            print("Archivos fueron procesados")
+
+
+    def __making_processeddatafiles(self,initial,**kwargs):
         
         try:
+            
+            station = kwargs.get("station",None)
+            verbose = kwargs.get("verbose",False)
+            real_time = kwargs.get("real_time",False)
+            tendency_days = kwargs.get("tendency_days",None)
+            statistic_qd = kwargs.get("statistic_qd",False)
+
+            ###############################################3
             initial_year = initial.year
             initial_month = initial.month
             initial_day = initial.day
