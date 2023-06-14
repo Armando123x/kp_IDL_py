@@ -5,7 +5,7 @@ import re
 import numpy  
 from scipy.signal import convolve
 from datetime import datetime
-
+import numbers 
 
 months = ['jan','feb','mar','apr','may','jun','jul','aug','sep',\
                       'sep','oct','nov','dec']
@@ -25,7 +25,11 @@ def smooth(data, window_size):
 
 
 
+def verifyisnumber(var):
 
+    if isinstance(var, numbers.Number):
+        return True
+    return False
 
 def check_dates (initial=None, final=None, **kwargs):
     # script geomagixs_check_dates.pro

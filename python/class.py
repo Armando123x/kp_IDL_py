@@ -156,7 +156,8 @@ class geomagixs (object):
             #################################################
             # CARGANDO DATOS
 
-            self.__ge
+            self.__magneticindex_compute(initial_date,final_date,station=self.GMS[self.system['gms']]['name'],force_all=force_all,real_time=real_time)
+            
 
  
         #script -> geomagixs_quietdays_download.pro
@@ -264,12 +265,654 @@ class geomagixs (object):
         fpath = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],file_name)
 
         exists = os.path.isfile(fpath)
+
+        if exists:
+            with open(fpath,'r') as file:
+                magnetic_data = numpy.array(file.readlines(),dtype='object')
+                number_of_lines = magnetic_data.shape[0]
+                for n, linea in enumerate(magnetic_data):
+
+                    valores = re.findall(r'\d+\.?\d*', linea)
+
+                    # Convertir los valores a enteros o números de punto flotante según corresponda
+                    valores = [int(v) if v.isdigit() else float(v) for v in valores]
+
+                    for key,value in zip(read_data.keys(),valores):
+
+                        read_data[n][key] = value
+        
+        else:
+            raise FileNotFoundError("El archivo {} no existe.".format(os.path.basename(fpath)))
+
+
+        result =  {'hour':numpy.empty(24,dtype=int),
+                   'delta_H' : numpy.empty(24,dtype=int),
+                   'sigma_H' : numpy.empty(24,dtype=int)}
+
+        for i in range(24):
+            result['hour'][i] = vectorize(read_data[i*60],'hour')
+            result['delta_H'][i] = numpy.median(vectorize(read_data[i*60:(i+1)*60-1],'d_H'))
+            result['sigma_H'][i]    = numpy.median(vectorize(read_data[i*60:(i+1)*60-1],'sigma_H'))
+        
+
+        return result
+    
+    def __getting_magneticprofiles(self,initial,**kwargs):
+
+        verbose = kwargs.get('verbose',False)
+        real_time = kwargs.get('real_time',False)
+
+        initial_year = initial.year
+        initial_month = initial.month
+        initial_day = initial.day
+
+        ###################################333
+        key = ['hour','minute','D','H','Z','F']
+        struct = dict.fromkeys(key,999999)
+        struct['D'] = 9999
+
+
+        minutes_per_day = 1440
+
+        read_data = numpy.empty(minutes_per_day,dtype='object')
+
+        read_data.fill(struct)
+
+        for i in range(24):
+            read_data[i]['hour'] = i 
+            read_data[i*60:(i+1)*60-1]['minute'] = numpy.arange(60)
+        
+        file_kind = '.early' if real_time else '.final'
+
+        file_name = '{}_{:4d}{:02d}{:02d}.data{}'.format(self.GMS[self.system['gms']]['code'],initial_year,initial_month,initial_day,file_kind)
+
+        fpath = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],file_name)
+
+        exists = os.path.isfile(fpath)
+
+        if exists:
+            with open(fpath,'r') as file:
+
+                magnetic_data = numpy.array(magnetic_data,dtype='object')
+                number_of_lines = magnetic_data.shape[0]
+
+                for n,linea in enumerate(magnetic_data):
+                    valores = re.findall(r'\d+\.?\d*', linea)
+
+                    # Convertir los valores a enteros o números de punto flotante según corresponda
+                    valores = [int(v) if v.isdigit() else float(v) for v in valores]
+
+                    for key,value in zip(read_data.keys(),valores):
+
+                        read_data[n][key] = value
+
+        else:
+            return 
+
+        data_per_hour = 10 
+        data_points = 24*data_per_hour
+        data_period = 60//data_per_hour
+
+        result = dict.fromkeys(key,numpy.empty(data_points,dtype=float))
+
+        for i in range(data_points):
+            result['hour'][i]        = vectorize(read_data[i*data_period],'hour')
+            result['minute']['i']    = vectorize(read_data[i*data_period],'minute')
+
+            result['D'][i] = numpy.median(vectorize(read_data[i*data_period:(i+1)*data_period-1],'D'))   
+            result['H'][i] = numpy.median(vectorize(read_data[i*data_period:(i+1)*data_period-1],'H'))   
+            result['Z'][i] = numpy.median(vectorize(read_data[i*data_period:(i+1)*data_period-1],'Z'))   
+            result['F'][i] = numpy.median(vectorize(read_data[i*data_period:(i+1)*data_period-1],'F'))   
+        
+
+        return result 
+    
+    def __kp2ap (self,k_tmp):
+        if (k_tmp==0) :return 0
+        if (k_tmp==3) :return 2
+        if (k_tmp==7) :return 3
+        if (k_tmp==10) :return 4
+        if (k_tmp==13) :return 5
+        if (k_tmp==17) :return 6
+        if (k_tmp==20) :return 7
+        if (k_tmp==23) :return 9
+        if (k_tmp==27) :return 12
+        if (k_tmp==15) :return 30
+        if (k_tmp==33) :return 18
+        if (k_tmp==37) :return 22
+        if (k_tmp==40) :return 27
+        if (k_tmp==43) :return 32
+        if (k_tmp==47) :return 39
+        if (k_tmp==50) :return 48
+        if (k_tmp==53) :return 56
+        if (k_tmp==57) :return 67
+        if (k_tmp==6) :return 80
+        if (k_tmp==63) :return 94
+        if (k_tmp==67) :return 111
+        if (k_tmp==70) :return 132
+        if (k_tmp==73) :return 154
+        if (k_tmp==77) :return 179
+        if (k_tmp==80) :return 207
+        if (k_tmp==83) :return 236
+        if (k_tmp==87) :return 300
+        if (k_tmp==90) :return 400
+        if (k_tmp==999) :return 999
+
+    def __dayly_kp (self,k_tmp):
+        tmp = numpy.where(k_tmp<999)[0]
+
+        if len(tmp) == 0: return 999
+
+        result = numpy.ceil(numpy.sum(k_tmp[tmp]))
+
+        result = (result // 10) * 10 +3 if result % 10 ==2 else result
+        result = (result // 10) * 10 +3 if result % 10 ==5 else result
+        result = (result // 10) * 10 +7 if result % 10 ==6 else result
+        result = (result // 10) * 10 +7 if result % 10 ==6 else result
+        result = (result // 10) * 10 +10 if result % 10 ==9 else result
+
+        return result 
+    
+    def __dayly_a(self,a_tmp):
+        tmp = numpy.where(a_tmp < 999)
+
+        if len(tmp) == 0: return 999
+
+        return numpy.ceil(numpy.mean(a_tmp[tmp]))
+    
+
+    def __dH2Kp (self,dH_tmp,dH_table):
+
+        MAX_dH  = 1000
+
+        if not isinstance(dH_table,numpy.ndarray):
+            dH_table = numpy.array(dH_table)
+        
+        elif not isinstance(dH_table,list):
+            
+            raise TypeError ("Introduzca un valor válido para dH_table.")
+
+        if dH_table.shape[0] != 28:
+            MAX_dH =1000
+            dH_table =  [ 4.7,  5.4,  6.4,  7.2,  8.2,  9.7, 11.0, 
+                                                       12.5, 14.8, 16.8, 19.1, 22.6, 25.6, 29.1,  
+                                                       34.4, 39.1, 44.4, 52.5, 59.6, 67.7, 80.1,  
+                                                       90.9,103.2,122.2,138.7,157.5,186.4,211.6]
+
+            result = 0*(dH_tmp <= dH_table[1]) +  \
+                        3*(dH_tmp > dH_table[1]  and dH_tmp <= dH_table[2]) +  \
+                        7*(dH_tmp  > dH_table[2]  and dH_tmp <= dH_table[3]) +  \
+                        10*(dH_tmp  > dH_table[3]  and dH_tmp <= dH_table[4]) +  13*(dH_tmp  > dH_table[4]  and dH_tmp <= dH_table[5]) + 17*(dH_tmp  > dH_table[5]  and dH_tmp <= dH_table[6]) +  \
+                        20*(dH_tmp  > dH_table[6]  and dH_tmp <= dH_table[7]) +  23*(dH_tmp  > dH_table[7]  and dH_tmp <= dH_table[8]) +  \
+                        27*(dH_tmp  > dH_table[8]  and dH_tmp <= dH_table[9]) +  \
+                        30*(dH_tmp  > dH_table[9]  and dH_tmp <= dH_table[10]) +  \
+                        33*(dH_tmp  > dH_table[10]  and dH_tmp <= dH_table[11]) +  \
+                        37*(dH_tmp  > dH_table[11]  and dH_tmp <= dH_table[12]) +  \
+                        40*(dH_tmp  > dH_table[12]  and dH_tmp <= dH_table[13]) +  \
+                        43*(dH_tmp  > dH_table[13]  and dH_tmp <= dH_table[14]) +  \
+                        47*(dH_tmp  > dH_table[14]  and dH_tmp <= dH_table[15]) +  \
+                        50*(dH_tmp  > dH_table[15]  and dH_tmp <= dH_table[16]) +  \
+                        53*(dH_tmp  > dH_table[16]  and dH_tmp <= dH_table[17]) +  \
+                        57*(dH_tmp  > dH_table[17]  and dH_tmp <= dH_table[18]) +  \
+                        60*(dH_tmp  > dH_table[18]  and dH_tmp <= dH_table[19]) +  \
+                        63*(dH_tmp  > dH_table[19]  and dH_tmp <= dH_table[20]) +  \
+                        67*(dH_tmp  > dH_table[20]  and dH_tmp <= dH_table[21]) +  \
+                        70*(dH_tmp  > dH_table[21]  and dH_tmp <= dH_table[22]) +  \
+                        73*(dH_tmp  > dH_table[22]  and dH_tmp <= dH_table[23]) +  \
+                        77*(dH_tmp  > dH_table[23]  and dH_tmp <= dH_table[24]) +  \
+                        80*(dH_tmp  > dH_table[24]  and dH_tmp <= dH_table[25]) +  \
+                        83*(dH_tmp  > dH_table[25]  and dH_tmp <= dH_table[26]) +  \
+                        87*(dH_tmp  > dH_table[26]  and dH_tmp <= dH_table[27]) +  \
+                        90*(dH_tmp  > dH_table[27]  and dH_tmp < MAX_dH) +  \
+                        999*(dH_tmp >= MAX_dH)
+            
+            return result
+        
+    def __ReadCalibration_MAGIND(self):
+
+        calibration_name = os.path.join(self.system['auxiliar_dir'],self.GMS[self.system['gms']]['name']+'.calibration')
+
+        exist = os.path.isfile(calibration_name)
+
+        with (calibration_name,'r') as file:
+
+            calibration_data = numpy.array(file.readlines(),dtype='object')
+
+            number_of_lines = calibration_data.shape[0]
+
+
+            
+
+            valores = re.findall(r'\d+\.?\d*', calibration_data[12])
+
+            # Convertir los valores a enteros o números de punto flotante según corresponda
+            valores = [int(v) if v.isdigit() else float(v) for v in valores]
+
+            result = {'dH_table': numpy.array(valores,dtype=float)}
+
+        return result
+
+    def __getting_kindex(self,date,**kwargs):
+
+        def generate_chain (type_A,type_B):
+
+            init = ''
+
+            for data in type_A:
+                if len(init)>0: init = init +' '
+                chain = '{:03d}'.format(data)
+                init = init + chain
+            for data in type_B:
+                if len(init)>0: init = init +' '
+                chain = '{:03d}'.format(data)
+                init = init + chain            
+            
+            return init 
         
 
 
 
+        verbose = kwargs.get('verbose',False)
+        real_time = kwargs.get('real_time',False)
+        station = kwargs.get('station',None)
 
 
+        initial_year,initial_month,initial_day = date.year,date.month,date.__dayly_kp
+
+        calibration = self.__ReadCalibration_MAGIND()
+        data = self.__getting_deltab(date,verbose=verbose,real_time=real_time)
+
+        K_mex = self.__dH2Kp(data['delta_H'],calibration['dH_table'])
+        K_mex_max = self.__dH2Kp(data['delta_H']+data['sigma_H'],calibration['dH_table'])
+        K_mex_min = self.__dH2Kp(data['delta_H']-data['sigma_H'],calibration['dH_table'])
+
+
+        a_mex = self.__kp2ap(K_mex)
+        a_mex_max = self.__kp2ap(K_mex_max)
+        a_mex_min = self.__kp2ap(K_mex_min)
+
+        for i in range(K_mex):
+
+            if i >1 :
+                if K_mex[i] == 90  and K_mex[i-1] <= 37:
+                    K_mex[i] = 999
+            if i < K_mex.shape[0]-1 :
+                if K_mex[i] == 90 and K_mex[i+1]<= 57:
+                    K_mex[i] = 999
+
+        
+        k_mex_data = numpy.empty(6,dtype=object)
+        
+        ###
+        for n, value in enumerate([K_mex,a_mex,K_mex_max,a_mex_max,K_mex_min,a_mex_min]):
+            k_mex_data[n] = generate_chain(value,self.__dayly_kp(value))
+ 
+        extension = '.early' if real_time else '.final'
+
+        output_datafile = '{}_{:4d}{:02d}{:02d}.k_index{}'.format(self.GMS[self.system['gms']]['code'],initial_year,initial_month,initial_day,extension)
+        output_path = os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'],output_datafile)
+
+        with open(output_path,'w') as file:
+            file.writelines(k_mex_data)
+
+
+        if self.verbose:
+            print("Guardando {}.".format(os.path.basename(output_path)))
+
+        return 
+    
+    def __getting_deltahindex(self,date,**kwargs):
+        def generate_chain (type_A,type_B):
+            
+            if not isinstance(type_A, list) or not isinstance(type_A,numpy.ndarray):
+                type_A = [type_A]
+            if not isinstance(type_B, list) or not isinstance(type_B, numpy.ndarray):
+                type_B = [type_B]
+            init = ''
+
+            for data in type_A:
+             
+                chain = ' {:8.1f}'.format(data)
+                init = init + chain
+            for data in type_B:
+                if len(init)>0: init = init +' '
+                chain = ' {:8.1f}'.format(data)
+                init = init + chain            
+            
+            return init 
+        
+
+        verbose = kwargs.get("verbose",False)
+        real_time = kwargs.get("real_time",False)
+        station = kwargs.get("station",None)
+
+
+        initial_year, initial_month,initial_day = date.year,date.month,date.day
+
+        ###(
+        data = self.__getting_deltah(date,verbose=verbose,real_time=real_time)
+
+        good_indexes = numpy.where(data['delta_H']<999990)[0]
+
+
+        dh_mex_data = numpy.empty(2,dtype='object')
+
+        if len(good_indexes)==0:
+            dh_mex_data[0] = generate_chain(data['delta_H'],numpy.mean(data['delta_H']))
+            dh_mex_data[1] = generate_chain(data['sigma_H'],numpy.mean(data['sigma_H']))
+        else:
+            dh_mex_data[0] = generate_chain(data['delta_H'],numpy.mean(data['delta_H'][good_indexes]))
+            dh_mex_data[1] = generate_chain(data['sigma_H'],numpy.mean(data['sigma_H'][good_indexes]))
+
+
+
+
+        extention = '.early' if real_time else '.final'
+
+        output_datafile = '{}_{}{}{}.delta_H{}'.format(self.GMS[self.system['gms']]['code'],initial_year,initial_month,initial_day,extention)    
+        output_path = os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'])
+        
+        fpath = os.path.join(output_path,output_datafile)
+        with open(fpath, 'w') as file:
+            file.writelines(dh_mex_data)
+        
+
+        if self.verbose:
+            print("Guardando {}".format(os.path.basename(fpath)))
+        
+
+        return 
+
+    
+    def __getting_profiles(self,date,**kwargs):
+        
+        verbose = kwargs.get('verbose',False)
+        real_time = kwargs.get("real_time",False)
+        station = kwargs.get("station",None)
+
+        initial_year = date.year
+        initial_month = date.month
+        initial_day = date.day  
+
+        ###################33
+        # Leyendo y procesando datos 
+
+        data = self.__getting_magneticprofiles(date,verbose=verbose,real_time=real_time)
+
+        good_indexes = numpy.where(data['H']<999990)
+
+        profile_data = numpy.empty(data['H'].shape[0],dtype='object')
+
+        for i in range(data['H'].shape[0]):
+            chain = '{:02d}:{:02d}  '+'  {:8.1f}'*4
+            profile_data [i] = chain.format(data['hour'][i],data['minute'][i],data['D'][i],data['H'][i],data['Z'][i],data['F'][i])
+        
+        extention = '.early' if real_time else '.final'
+
+        output_datafile  = '{}_{:4d}{:02d}{:02d}.profiles{}'.format(self.GMS[self.system['gms']]['code'],initial_year,initial_month,initial_day,extention)
+        output_path = os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'])
+
+        fpath = os.path.join(output_path,output_datafile)
+
+        with open(fpath,'w') as file:
+            file.writelines(profile_data)
+        
+        if self.verbose:
+            print("Guardando {}.".format(os.path.basename(fpath)))
+
+        return 
+    
+    def __getting_kpindex(self,date,**kwargs):
+        
+        def generate_txt (textA,textB):
+
+            if verifyisnumber(textA): textA = [textA]
+            if verifyisnumber(textB): textB = [textB]
+
+            chain = '{:03d}'
+            text = ''
+            for n,value in enumerate(textA):
+                if n>0 : text = text + ' '
+                text = text+ chain.format(value)
+
+            text = text + ' '   
+            for n,value in enumerate(textB):
+                if n>0 : text = text + ' '
+                text = text+ chain.format(value)
+            
+            return text 
+
+        verbose = kwargs.get("verbose",False)
+        real_time = kwargs.get("real_time",False)
+        station = kwargs.get("station",None)
+
+        initial_year = date.year
+        initial_month = date.month
+        initial_day = date.day  
+
+        string_date ='{:4d}{:02d}{:02d}'.format(initial_year,initial_month,initial_day)
+        ###################3
+        kmex_file_name = '{}_{}.differences'.format(self.GMS[self.system['gms']]['code'],string_date)        
+
+        fpath = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],kmex_file_name)
+
+        exists = os.path.isfile(fpath)
+
+        if exists:
+            with open(fpath,'r') as file:
+                tmp_data = numpy.array(file.readlines(),dtype='object')
+                number_of_lines = tmp_data.shape[0]
+        else:
+            raise ("Archivo se encuentra perdido {}".format(os.path.basename(fpath)))
+            return 
+        
+        str_tmp = {'kp':0}
+
+        kp_data = numpy.empty(number_of_lines,dtype='object')
+        kp_data.fill(str_tmp)
+
+        for n,linea in enumerate(tmp_data):
+            
+            valores = re.findall(r'\d+\.?\d*', linea)
+
+                    # Convertir los valores a enteros o números de punto flotante según corresponda
+            valores = [int(v) if v.isdigit() else float(v) for v in valores]
+
+            kp_data[n]['kp'] = valores[0]
+        ###################3
+        kmex_file_name = '{}_{}.data'.format(self.GMS[self.system['gms']]['code'],string_date)        
+
+        fpath = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],kmex_file_name)
+
+        exists = os.path.isfile(fpath)
+
+        if exists:
+            with open(fpath,'r') as file:
+                tmp_data = numpy.array(file.readlines(),dtype='object')
+                number_of_lines = tmp_data.shape[0]
+        else:
+            raise ("Archivo se encuentra perdido {}".format(os.path.basename(fpath)))
+            return 
+        
+        str_tmp = {'Dst':0}
+
+        dst_data = numpy.empty(number_of_lines,dtype='object')
+        dst_data.fill(str_tmp)
+
+        for n,linea in enumerate(tmp_data):
+            
+            valores = re.findall(r'\d+\.?\d*', linea)
+
+                    # Convertir los valores a enteros o números de punto flotante según corresponda
+            valores = [int(v) if v.isdigit() else float(v) for v in valores]
+
+            dst_data[n]['kp'] = valores[0]
+        
+        K_mex = vectorize(kp_data,'kp')
+        K_mex_max = K_mex*0
+        K_mex_min = K_mex*0
+
+        a_mex = self.__kp2ap(K_mex)
+        a_mex_max = self.__kp2ap(K_mex_max)
+        a_mex_min = self.__kp2ap(K_mex_min)
+
+        k_mex_data = numpy.empty(6,dtype='object')
+
+
+        for n,element in enumerate([K_mex,a_mex,K_mex_max,a_mex_max,K_mex_min,a_mex_min]):
+
+            k_mex_data[n] = generate_txt(element,self.__dayly_kp(element))
+
+
+        #creamos el data file 
+
+        extention  = ''
+
+        output_datafile = '{}_{:4d}{:02d}{:02d}'.format(self.GMS[self.system['gms']]['code'],initial_year,initial_month,initial_day)
+        output_path = os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'])
+
+        fpath = os.path.join(output_path,output_datafile)
+
+        with open(fpath,'w') as file:
+            file.writelines(k_mex_data)
+
+        if self.verbose:
+            print("Guardando {}".format(os.path.basename(output_datafile)))
+
+        
+        data = vectorize(dst_data,'Dst')
+
+        good_indexes = numpy.where(data<9990)
+
+        dH_mex_data = numpy.empty(2,dtype='object')
+        tmp = numpy.empty(25,dtype=float)
+
+        def generate_txt2(textA,textB=None):
+            data = ''
+            if verifyisnumber(textA):textA=[textA]
+            if verifyisnumber(textB):textB=[textB]
+            format_ = ' {:8.1f}'
+            text = ''
+
+            for n,value in enumerate(textA):text = text + format_.format(value)
+            if textB is not None:
+                for n,value in enumerate(textB):text = text + format_.format(value)
+            return text
+
+
+        if len(good_indexes)==0:
+            dH_mex_data[0] = generate_txt2(data,numpy.mean(data))
+            dH_mex_data[1] = generate_txt2(tmp)
+        else:
+            dH_mex_data[0] = generate_txt2(data,numpy.mean(data[good_indexes]))
+            dH_mex_data[1] = generate_txt2(tmp)
+
+        extention = ''
+
+        output_datafile = '{}_{:4d}{:02d}{:02d}'.format(self.GMS[self.system['gms']]['code'],initial_year,initial_month,initial_day)
+        output_path = os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'])
+
+        fpath = os.path.join(output_path,output_datafile)
+        
+        with open(fpath,'w') as file:
+            file.writelines(dH_mex_data)
+        
+        if self.verbose:
+            print("Guardando {}".format(os.path.basename(fpath)))
+
+
+    def __magneticindex_compute(self,initial,final,**kwargs):
+        station = kwargs.get("station",None)
+        verbose = kwargs.get("verbose",False)
+        force_all = kwargs.get("force_all",False)
+        real_time = kwargs.get("real_time",False)
+
+        initial_year = initial.year
+        initial_month = initial.month
+        initial_day = initial.day
+
+        final_year = final.year
+        final_month = final.month
+        final_day = final.day
+
+
+        file_number = (JULDAY(final)-JULDAY(initial))+1
+
+        data_file_name = numpy.empty(file_number,dtype='object')
+
+        string_date = numpy.empty(file_number,dtype='object')
+
+        if station != 'planetary':
+            extention = '.early' if real_time else '.final'
+        else:
+            extention = ''
+        
+        for i in range(file_number):
+            
+            tmp_julday = JULDAY(initial)
+            result = CALDAT(tmp_julday)
+            tmp_year, tmp_month,tmp_day = result.year,result.month,result.day
+
+            string_date[i] =  '{:4d}{:02d}{:02d}'.format(tmp_year,tmp_month,tmp_day)
+
+            data_file_name[i] = '{}_{}.differences{}'.format(self.GMS[self.system['gms']]['code'],string_date[i],extention)
+
+        fpath = [os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],file) for file in data_file_name]
+        exists_files = [os.path.isfile(fp) for fp in fpath]
+        
+        capable_to_update = len(numpy.where(exists_files == True)[0])
+            
+        if capable_to_update == 0 :
+            if self.verbose:
+                print(" Data File Error: No se encuentran archivos del tipo GMS_YYYYMMDD.differences{}. La data será asumida con gaps.".format(extention))
+        
+        name_k_index = numpy.empty(file_number,dtype= 'object')
+
+        for n,value in enumerate(string_date):
+            name_k_index[n] = '{}_{}.k_index{}'.format(self.GMS[self.system['gms']]['code'],string_date[n],extention)
+            name_k_index[n] = os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'],name_k_index[n])
+
+        exist_result_files = [os.path.isfile(fp) and not force_all for fp in name_k_index]
+
+        make_update_file = exists_files and not exist_result_files
+
+        if numpy.sum(make_update_file)>0:
+            files_to_update = len(numpy.where(make_update_file)[0])
+        else:
+            files_to_update = 0 
+        
+        if self.verbose:
+            if files_to_update>0:
+                print("Un total de archivos necesitan ser actualizados".format(files_to_update))
+            else:
+                print("No hay archivos para actualizar.")
+            
+            if capable_to_update > files_to_update : 
+                print("Todavia hay {} archivos que pueden ser actualizados. Use el comando /FORCE_ALL para forzar la actualización".format(capable_to_update-files_to_update))
+            
+            if len(exists_files) > capable_to_update:
+                print("Existen {} archivos que son imposibles de actualizar. Use la herramienta UPDATE_MAGNETICDATA para actualizar la database.".format(len(exists_files)-capable_to_update))
+
+        
+        for i in range(make_update_file):
+            if make_update_file[i] == 1
+
+            tmp_year, tmp_month,tmp_day = int(string_date[:4]),int(string_date[4:6]),int(string[6:8])
+            date = datetime(tmp_year,tmp_month,tmp_day)
+            if station != 'planetary':
+                self.__getting_kindex(date,verbose=verbose,station=station,real_time=real_time)
+                self.__getting_deltahindex(date,verbose=verbose,station=station,real_time=real_time)
+                self.__getting_profiles(date,verbose=verbose,station=station,real_time=real_time)
+            else:
+                self.__getting_kpindex(date,verbose=verbose,station=station,real_time=real_time)
+        
+        if self.verbose:
+            print("Magnetic-Index fueron actualizados.")
+
+        return 
+    
+
+            
 
     def __getting_magneticdata_forcleaning(self,initial,**kwargs):
 
