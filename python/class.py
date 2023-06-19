@@ -4925,12 +4925,14 @@ class geomagixs (object):
 
 
 
-    def __check_system(self,quiet=False):
+    def __check_system(self,**kwargs):
         # archivo ->geomagixs_check_system.pro
         # funcion -> geomagixs_check_system
         #Transcripcion completada
 
-        try:
+    
+            verbose = kwargs.get("verbose",False)
+
             if(self.Flag_system == False):
 
                 self.Flag_system = True
@@ -4938,7 +4940,7 @@ class geomagixs (object):
                 if (self.system['geomagixs_dir'] == ''):
                     os.chdir(os.getcwd())
                     self.system['geomagixs_dir']=os.getcwd()
-                #revisar tmp
+           
 
                 if(self.system['setup_file'] == ''):
                     self.system['setup_file']='setup.config'
@@ -4948,7 +4950,7 @@ class geomagixs (object):
                       or not os.access(os.path.join(self.system['geomagixs_dir'], self.system['setup_file']), \
                                        os.R_OK):
                     
-                    if quiet is True:
+                    if verbose:
                         print("Error critico: setup file, 'A' no ha sido encontrado.",self.system['setup_file'],\
                               "Imposible leer system-congif data.")
                         
@@ -4963,7 +4965,7 @@ class geomagixs (object):
                         
                         buff_array= list()
 
-                        if quiet is True:
+                        if verbose is True:
                               
                             print("Leyendo datos del fichero: {}".format(self.system['setup_file']))
                         #modificacion, solo se lee las lineas que empiezan con "~"
@@ -4976,7 +4978,7 @@ class geomagixs (object):
                         #verificamos que se guardó 3 datos
 
                         if (len(buff_array)!=3):
-                            if quiet is True:
+                            if verbose is True:
 
                                 print("Error critico: Revisar fichero {}, es imposible de leer datos\
                                        del archivo de configuracion.".format(self.system['setupfile']))
@@ -4988,13 +4990,13 @@ class geomagixs (object):
                             
                             input_dir   = buff_array[0]
                             
-                            if quiet is True:
+                            if verbose is True:
                                 print("Revisando arbol del directorio {}".format(input_dir))
 
                             if os.access(input_dir, os.R_OK) is False:
                                 #No se tiene permisos para escribir
 
-                                if quiet is True:
+                                if verbose is True:
                                     print("Error critico: Imposible de leer la carpeta 'input' del \
                                           directorio '{}'. Es obligatorio conceder los permisos de \
                                           lectura del directorio 'input'".format(input_dir))
@@ -5004,14 +5006,14 @@ class geomagixs (object):
 
                             
                             self.system['input_dir']=input_dir
-
+ 
                             #revisamos si tiene permisos la carpeta auxiliar
 
                             auxiliar_dir = buff_array[1]
 
                             if os.access(auxiliar_dir, os.R_OK) is False:
 
-                                if quiet is True:
+                                if verbose is True:
                                     print("Error critico: Imposible de leer la carpeta 'auxiliar' del \
                                           directorio '{}'. Es obligatorio conceder los permisos de \
                                           lectura del directorio 'auxiliar'".format(auxiliar_dir))
@@ -5021,8 +5023,7 @@ class geomagixs (object):
                                 self.Error['log']+='Auxiliar directory '+input_dir+' not found or reading permission conflict. '
 
 
-
-                            self.system['auxiliar_dir']=auxiliar_dir
+ 
 
                             ###datasource_dir
 
@@ -5037,7 +5038,7 @@ class geomagixs (object):
                             if os.access(self.system['datasource_dir'], os.R_OK) is False:
                                 
 
-                                if quiet is True:
+                                if verbose is True:
                                     print("Error critico: Imposible de leer la carpeta 'auxiliar' del \
                                           directorio '{}'. Es obligatorio conceder los permisos de \
                                           lectura del directorio 'auxiliar'".format(self.system['datasource_dir']))
@@ -5058,7 +5059,7 @@ class geomagixs (object):
 
                             if os.access(self.system['qdays_dir'], os.R_OK) is False:
 
-                                if quiet is True:
+                                if verbose is True:
 
                                     print("Error critico: Imposible de leer la carpeta 'qdays' del \
                                           directorio '{}'. Es obligatorio conceder los permisos de \
@@ -5073,14 +5074,14 @@ class geomagixs (object):
                             output_dir = buff_array[2]
 
 
-                            if quiet is True:
+                            if verbose:
                                 print('Revisando arbol del directorio de salida {}.'.format(self.system['output_dir']))
 
                             if os.access(output_dir, os.R_OK) is False:
 
-                                if quiet is True:
+                                if verbose is True:
 
-                                    print("Error critico: Imposible de leer la carpeta 'output' del \
+                                    Warning("Error critico: Imposible de leer la carpeta 'output' del \
                                           directorio '{}'. Es obligatorio conceder los permisos de \
                                           lectura del directorio 'output'".format(output_dir))
                                     
@@ -5088,7 +5089,7 @@ class geomagixs (object):
                                 self.Error['log']+= 'Input data directory '+output_dir+' not found or read permission conflict. '
 
                             
-                            self.system['output_dir']=output_dir
+
 
                             ####
 
@@ -5099,9 +5100,9 @@ class geomagixs (object):
                             
                             if os.access(self.system['indexes_dir'], os.R_OK) is False:
 
-                                if quiet is True:
+                                if verbose:
 
-                                    print("Error critico: Imposible de leer la carpeta 'indexes_directory' del \
+                                    Warning("Error critico: Imposible de leer la carpeta 'indexes_directory' del \
                                           directorio '{}'. Es obligatorio conceder los permisos de \
                                           lectura del directorio 'indexes_directory'".format(self.system['indexes_dir']))
                                     
@@ -5116,7 +5117,7 @@ class geomagixs (object):
                                 
                             if os.access(self.system['plots_dir'], os.W_OK) is False:
                                 
-                                if quiet is True:
+                                if verbose:
 
                                     print("Error critico: Imposible de poder escribir la carpeta 'plots' del \
                                           directorio '{}'. Es obligatorio conceder los permisos de \
@@ -5134,7 +5135,7 @@ class geomagixs (object):
                                 
                             if os.access(self.system['plots_dir'], os.W_OK) is False:
                                 
-                                if quiet is True:
+                                if verbose:
 
                                     print("Error critico: Imposible de poder escribir la carpeta 'plots' del \
                                           directorio '{}'. Es obligatorio conceder los permisos de \
@@ -5152,7 +5153,7 @@ class geomagixs (object):
                             if os.access(os.path.join(self.system['geomagixs_dir'],self.system['gms_file']),os.R_OK) is False:
                                 
 
-                                if quiet is True:
+                                if verbose:
 
                                     print("Error critico: Imposible de leer GMS data del \
                                           directorio '{}'. Es obligatorio conceder los permisos de \
@@ -5179,7 +5180,7 @@ class geomagixs (object):
 
                                 if (len(buff_array) % 5 !=0):
 
-                                    if quiet is True:
+                                    if verbose:
                                         print("Error critico: Formato erroneo de {}. Imposible leer datade \
                                                file .gms".format(self.system['gms_file']))
 
@@ -5229,7 +5230,7 @@ class geomagixs (object):
                             if ((len(self.system['ftp_address'])*len(self.system['ftp_user'])<=0) and\
                                  (self.system['ftp_on'])>=1):
                                 
-                                if quiet  is True:
+                                if verbose:
 
                                     print("Critical Error: Conflicto con la data entrante. Data del FTP server\
                                           es inconsistente o invalido. Imposible de descargar data del servidor FTP.")
@@ -5241,11 +5242,7 @@ class geomagixs (object):
             else:
                 return
 
-        except:
-
-            print("Algo salio mal en el método '{}'".format(self.__check_system.__name__))
-
-            return 
+ 
 
 
     def __setup__commons(self,quiet=False):
