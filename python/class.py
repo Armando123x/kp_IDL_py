@@ -172,7 +172,7 @@ class geomagixs (object):
         except:
 
             raise AttributeError("Algo salio mal en el inicio del programa.")
-
+    
     def __getting_deltab(self,initial,**kwargs):
 
         verbose = kwargs.get('verbose',False)
@@ -1807,13 +1807,15 @@ class geomagixs (object):
         except:
             print("Ocurrió un error en __getting_magneticdata.")
 
-    def __reading_kmex_data(self,date,station=None,real_time=None,verbose=False):
+    def __reading_kmex_data(self,date,**kwargs):
 
-        try:
-            if real_time is None:
-                extension = '.final'
-            else:
-                extension = '.early'
+        
+            station = kwargs.get("station",None)
+            real_time = kwargs.get("real_time",False)
+            verbose = kwargs.get("verbose",False)
+
+
+            extension = '.early' if real_time else '.final'
             
             if station =='planetary':
                 extension=''
@@ -1849,9 +1851,18 @@ class geomagixs (object):
             if exists:
                 with open(file_name,'r') as file:
                     k_index_data = numpy.array(file.readlines(),dtype='object')
-                
+                    
+                    keys = [['K_mex','K_SUM'],['a_mex','A_median'],['K_mex_max','K_SUM_max'],['a_mex_max','A_median_max'],['K_mex_min','K_SUM_min'],['a_mex_min','A_median_min']]
+                    for n,linea in enumerate(k_index_data):
+                        valores = re.findall(r'\d+\.?\d*', linea)
 
-                ##falta linea 204 para captura de datos
+                        # Convertir los valores a enteros o números de punto flotante según corresponda
+                        valores = [int(v) if v.isdigit() else float(v) for v in valores]                
+
+                  
+                        result[keys[n][0]] = numpy.array(valores[:-1])
+                        result[keys[n][1]] = numpy.array(valores[-1])
+                
 
             else:
                 if verbose:
@@ -1859,20 +1870,387 @@ class geomagixs (object):
 
                 
                 for key in result.keys():
-                    if isinstance(result['key'],numpy.ndarray):
-                        result['key'].fill(999)
+                    if isinstance(result[key],numpy.ndarray):
+                        result[key].fill(999)
                     else:
-                        result['key']=999
+                        result[key]=999
             
 
-            ###### se reemplaza los datos 
-            #falta
-
-
-            #######
+       
             return result 
-        except: 
-            pass
+    
+    def __making_montlyfile_k(self,initial,**kwargs):
+
+        station = kwargs.get("station",None)
+        real_time = kwargs.get("real_time",False)
+        verbose = kwargs.get("verbose",False)
+
+
+
+        initial_year = initial.year
+        initial_month = initial.month
+        initial_day = initial.day
+
+
+        files_numbers = JULDAY((datetime(initial_year,initial_month,1)+relativedelta(days=-1))+relativedelta(months=1)) - JULDAY(datetime(initial_year,initial_month,1)+relativedelta(days=-1))
+
+        data_file_name = numpy.empty(files_numbers,dtype='object')
+        string_date = numpy.empty(files_numbers)
+        extention = '.early' if real_time else '.final'
+
+        for i in range(files_numbers):
+
+            tmp_julday = JULDAY(initial)
+
+            result = CALDAT(tmp_julday+i)
+            tmp_year,tmp_month,tmp_day = result.year,result.month,result.day
+            string_date[i] = "{:4d}{:02d}{:02d}".format(tmp_year,tmp_month,tmp_day)
+            data_file_name[i] = '{}_{}.k_index{}'.format(self.GMS[self.system['gms']]['code'],string_date[i],extention)
+        
+        fpaths = [os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'],file) for file in data_file_name]
+        exist_data_file = [os.path.isfile(path) for path in fpaths]
+
+        tmp = numpy.where(exist_data_file == True)[0]
+        capable_to_make = len(tmp)
+
+        if capable_to_make  != files_numbers:
+            print("Datos invalidos. Reemplazando datos con datos vacios. ")
+        
+
+        ###### creating empty containers
+
+        k_mex_data = numpy.empty(files_numbers*8,dtype=int)
+        k_SUM_data = numpy.empty(files_numbers,dtype=int)
+        a_mex_data = numpy.empty(files_numbers*8,dtype=int)
+        a_median_data = numpy.empty(files_numbers,dtype=int)
+
+        for i in range(files_numbers):
+            if exist_data_file[i]:
+                tmp_year,tmp_month,tmp_day = string_date[i][:4],string_date[i][4:6],string_date[6:8]
+                
+                tmp_year = int(tmp_year)
+                tmp_month = int(tmp_month)
+                tmp_day = int(tmp_day)
+
+                date = datetime(tmp_year,tmp_month,tmp_day)
+
+                tmp_data = self.__reading_kmex_data(date,verbose=verbose, station=station,real_time=real_time)
+
+                k_mex_data [i*8:(i+1)*8-1] = tmp_data['K_mex']
+                a_mex_data [i*8:(i+1)*8-1] = tmp_data['a_mex']
+                k_SUM_data [i] = tmp_data['K_sum']
+                a_median_data [i] = tmp_data['A_median']
+            else:
+                k_mex_data [i*8:(i+1)*8-1] = 999
+                a_mex_data [i*8:(i+1)*8-1] = 999
+                k_SUM_data [i] = 999
+                a_median_data [i] =999
+
+        cabecera_final  =  21
+
+        file_data = numpy.empty(files_numbers+cabecera_final)
+
+        data_type ='(nowcast)   ' if   real_time else  '(definitive)'
+
+        file_data[0] = ' FORMAT                 IAGA-2002x (Extended IAGA2002 Format)                         |'
+        file_data[1]          =' Source of Data         Space Weather National Laboratory, UNAM                       |'
+        str_tmp1 = ''
+        for _ in range (61 - len(self.GMS[self.system['gms']]['name'])+1) : str_tmp1+=' '
+        file_data[2]          =' Station Name           {}{}|'.format(self.GMS[self.system['gms']]['name'].upper(),str_tmp1)
+        file_data[3]        = ' IAGA CODE              {}{}'.format(self.GMS[self.system['gms']]['code'].upper(),'                                                           |')
+        file_data[4] =' Geodetic Latitude      {:8.3f}'.format(self.GMS[self.system['gms']]['latitude'])+'                                                      |'
+        file_data[5] =' Geodetic Longitude      {:8.3f}'.format(self.GMS[self.system['gms']]['longitude'])+'                                                      |'
+        file_data[6] =' Elevation      {:6.1f}'.format(self.GMS[self.system['gms']]['elevation'])+'                                                        |'
+        
+        file_data[7]          =' Reported               K and a indexes '+data_type+'                                  |'
+        file_data[8]          =' Sensor Orientation     variation:DHZF                                                |'
+        file_data[9]          =' Digital Sampling       1 seconds                                                     |'
+        file_data[10]         =' Data Interval Type     Filtered 3-hours (00:00:00 - 02:59:59)                        |'
+        file_data[11]         =' Data Type              Computed                                                      |'
+        file_data[12]         =' # Element              16 3-hourly values, and daily-total (k) and daily-average (a) |'
+        file_data[13]         =' # Unit                 nT                                                            |'
+        file_data[14]         =' # Data Gap             999                                                           |'
+        file_data[15]         =' # Issued by            Instituto de Geofísica, UNAM, MEXICO                          |'
+        file_data[16]         =' # URL                  http://www.lance.unam.mx                                      |'
+        file_data[17]         =' # Last Modified        Aug 17 2022                                                   |'
+        file_data[18]         =' # File type            Monthly                                                       |'
+        file_data[19]         =' # Reading Format       (I4,I2,I2,3X,I3,3X,9(X, I3),3X,9(X, I3))                      |'
+    
+        tmp_code = (self.GMS[self.system['gms']]['code'])
+        file_data[20] = 'DATE       DOY   K:03  06  09  12  15  18  21  24 Tot   a:03  06  09  12  15  18  21  24 Avg |'
+
+        extention = '.early' if real_time else '.final'
+        extention = '' if station=='planetary' else extention
+
+        file_name = '{}_{:4d}{:02d}.k_index{}'.format(self.system['indexes_dir'],initial_year,initial_month,extention)
+
+        file_dir = os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'])
+
+        fpath = os.path.join(file_dir,file_name)
+
+        with open(fpath,'w') as file:
+
+            file.writelines(file_data)
+
+            for i in range(files_numbers):
+
+                tmp_year,tmp_month,tmp_day = string_date[i][:4],string_date[i][4:6],string_date[i][6:8]
+
+                tmp_year = int(tmp_year)
+                tmp_month = int(tmp_month)
+                tmp_day = int(tmp_day)
+
+                tmp_doy = JULDAY(datetime(tmp_year,tmp_month,tmp_day)) - JULDAY(datetime(tmp_year-1,12,31))
+
+                ##################
+                ###Generator format
+                ###################
+                chain = '{:4d}{:02d}{:02d}   {:03d}   '
+                chain = chain + ' {:3d}'*9 + ' '*3 + ' {:3d}'*9
+
+                a0,a1,a2,a3,a4,a5,a6,a7 = k_mex_data[i*8],k_mex_data[i*8+1],k_mex_data[i*8+2],k_mex_data[i*8+3],k_mex_data[i*8+4],k_mex_data[i*8+5],k_mex_data[i*8+6],k_mex_data[i*8+7]
+                b0,b1,b2,b3,b4,b5,b6,b7 = a_mex_data[i*8],a_mex_data[i*8+1],a_mex_data[i*8+2],a_mex_data[i*8+3],a_mex_data[i*8+4],a_mex_data[i*8+5],a_mex_data[i*8+6],a_mex_data[i*8+7]
+                chain = chain.format(string_date[i],tmp_year,tmp_month,tmp_day,tmp_doy,a0,a1,a2,a3,a4,a5,a6,a7,k_SUM_data[i],
+                                     b0,b1,b2,b3,b4,b5,b6,b7,a_median_data[i])
+                file.write(chain+'\n')
+            
+        if self.verbose:
+            print("Guardanod {}".os.path.basename(fpath))
+
+
+    def __reading_deltah_data(self,date,**kwargs):
+        station = kwargs.get("station",None)
+        real_time = kwargs.get("real_time",False)
+        verbose = kwargs.get("verbose",False)
+
+
+        extention = '.early' if real_time  else '.final'
+        extention = '' if station=='planetary' else extention
+
+        string_date = '{:4d}{:02d}{:02d}'.format(date.year,date.month,date.day)
+
+        file_name =os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'],'{}_{}.delta_H{}'.format(self.GMS[self.system['gms']]['code'],string_date,extention))
+
+
+
+        exists = os.path.isfile(file_name)
+
+        if exists:
+            with open(file_name,'r') as file:
+                k_index_data =  numpy.array(file.readlines())
+                number_of_lines = k_index_data.shape[0]
+
+        
+        result = {'delta_H': numpy.empty(25,dtype=float),
+                  'sigma_H': numpy.empty(25,dtype=float)}
+
+        tmp = {'z':numpy.empty(25,dtype=float)}
+
+        tmp_var = numpy.empty(2,dtype=object)
+        tmp_var.fill(tmp)
+        
+        for n,linea in enumerate(k_index_data):
+            valores = re.findall(r'\d+\.?\d*', linea)
+            # Convertir los valores a enteros o números de punto flotante según corresponda
+            valores = [int(v) if v.isdigit() else float(v) for v in valores]
+            if n==0:result['delta_H'] = numpy.array(valores)
+            if n==1:result['sigma_H'] = numpy.array(valores)
+
+        return result 
+
+    def __making_montlyfile_dh(self,initial,**kwargs):
+        station = kwargs.get("station",None)
+        real_time = kwargs.get("real_time",False)
+        verbose = kwargs.get("verbose",False)
+
+
+        ####3
+
+        initial_year = initial.year
+        initial_month  = initial.month
+        initial_day  = initial.day
+
+
+
+        ####
+
+        file_number  = (JULDAY(datetime(initial_year,initial_month,1)+relativedelta(months=-1)+relativedelta(days=-1)))
+        file_number = file_number - JULDAY(datetime(initial_year,initial_month,1)+relativedelta(days=-1))
+
+        data_file_name = numpy.empty(file_number,dtype='object')
+
+        string_date = numpy.empty(file_number,dtype='object')
+
+        extention = '.early' if real_time else '.final'
+
+        extention = '' if station=='planetary' else extention
+
+        for i in range(file_number):
+
+            result = JULDAY(initial)
+
+            result = CALDAT(result+i)
+            tmp_year,tmp_month,tmp_day=result.year,result.month,result.day
+
+            string_date[i] = '{:4d}{:02d}{:02d}'.format(tmp_year,tmp_month,tmp_day)
+
+            data_file_name[i] = '{}_{}.delta_H{}'.format(self.GMS[self.system['gms']]['code'],string_date[i],extention)
+        
+        fpaths = [os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'],file) for file in data_file_name]
+        exist_data_file = [os.path.isfile(file) for file in fpaths]
+
+        tmp = numpy.where(exist_data_file==True)[0]
+        capable_to_make = len(tmp)
+
+        if capable_to_make != file_number and self.verbose:
+            print("Warning: Valores invalidos, reemplazando valores conflictivos con datos genericos. Archivos de tipo GMS_YYYYMMDD.delta_H{}.".format(extention))
+
+        dH_data = numpy.empty(file_number*25,dtype=float)
+
+        for i in range(file_number):
+
+            if exist_data_file[i] == True:
+                
+                tmp_year, tmp_month,tmp_day = string_date[i][:4],string_date[i][4:6],string_date[i][6:8]
+
+                tmp_year = int(tmp_year)
+                tmp_month = int(tmp_month)
+                tmp_day = int(tmp_day)
+
+
+                tmp_data = self.__reading_deltah_data(datetime(tmp_year,tmp_month,tmp_day),verbose=verbose,station=station,real_time=real_time)
+
+                dH_data [i*25:(i+1)*25-1] = tmp_data['delta_H']
+
+            else:
+                dH_data[i*25:(i+1)*25-1] = 999999
+            
+
+            
+        cabecera_final = 21
+
+        file_data = numpy.empty(file_number+cabecera_final,dtype='object')
+        data_type ='(nowcast)   ' if   real_time else  '(definitive)'
+
+        file_data[0] = ' FORMAT                 IAGA-2002x (Extended IAGA2002 Format)                         |'
+        file_data[1]          =' Source of Data         Space Weather National Laboratory, UNAM                       |'
+        str_tmp1 = ''
+        for _ in range (61 - len(self.GMS[self.system['gms']]['name'])+1) : str_tmp1+=' '
+        file_data[2]          =' Station Name           {}{}|'.format(self.GMS[self.system['gms']]['name'].upper(),str_tmp1)
+        file_data[3]        = ' IAGA CODE              {}{}'.format(self.GMS[self.system['gms']]['code'].upper(),'                                                           |')
+        file_data[4] =' Geodetic Latitude      {:8.3f}'.format(self.GMS[self.system['gms']]['latitude'])+'                                                      |'
+        file_data[5] =' Geodetic Longitude      {:8.3f}'.format(self.GMS[self.system['gms']]['longitude'])+'                                                      |'
+        file_data[6] =' Elevation      {:6.1f}'.format(self.GMS[self.system['gms']]['elevation'])+'                                                        |'
+        
+        file_data[7]          =' Reported               K and a indexes '+data_type+'                                  |'
+        file_data[8]          =' Sensor Orientation     variation:DHZF                                                |'
+        file_data[9]          =' Digital Sampling       1 seconds                                                     |'
+        file_data[10]         =' Data Interval Type     Filtered 3-hours (00:00:00 - 02:59:59)                        |'
+        file_data[11]         =' Data Type              Computed                                                      |'
+        file_data[12]         =' # Element              16 3-hourly values, and daily-total (k) and daily-average (a) |'
+        file_data[13]         =' # Unit                 nT                                                            |'
+        file_data[14]         =' # Data Gap             999                                                           |'
+        file_data[15]         =' # Issued by            Instituto de Geofísica, UNAM, MEXICO                          |'
+        file_data[16]         =' # URL                  http://www.lance.unam.mx                                      |'
+        file_data[17]         =' # Last Modified        Aug 17 2022                                                   |'
+        file_data[18]         =' # File type            Monthly                                                       |'
+        file_data[19]         =' # Reading Format       (I4,I2,I2,3X,I3,3X,9(X, I3),3X,9(X, I3))                      |'
+    
+        tmp_code = (self.GMS[self.system['gms']]['code'])
+        file_data[20] = 'DATE       DOY   K:03  06  09  12  15  18  21  24 Tot   a:03  06  09  12  15  18  21  24 Avg |'
+
+        extention = '.early' if real_time else '.final'
+        extention = '' if station=='planetary' else extention
+
+        file_name = '{}_{:4d}{:02d}.delta_H{}'.format(self.GMS[self.system['gms']]['code'],initial_year,initial_month,extention)
+        
+        file_dir = os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'])
+
+        fpath = os.path.basename(file_dir,file_name)
+        with open(fpath, 'w') as file:
+            file.writelines(line+'\n' for line in file_data)
+
+            for i in range(cabecera_final):
+                 
+                tmp_year  = int(string_date[i][:4])
+                tmp_month = int(string_date[i][4:6])
+                tmp_day  = int(string_date[i][6:8])
+            
+                doy = JULDAY(datetime(tmp_year,tmp_month,tmp_day)) - JULDAY(datetime(tmp_year-1,12,31))
+                tmp_chain=''
+                for value in dH_data[i*25:(i+1)*25-1]:
+                    tmp_chain = tmp_chain + ' {:8.1f}'.format(value)
+            
+                chain = '{:4d}{:02d}{:02d}   {:03d}   {}'.format(tmp_year,tmp_month,tmp_day,doy,tmp_chain)
+
+                file.write(chain+'\n')
+            
+        return 
+    
+    def __geomagixs_magneticindex_monthlyfile(self,initial=None,final=None,**kwargs):
+        station = kwargs.get("station",None)
+        verbose = kwargs.get("verbose",False)
+        force_all = kwargs.get("force_all",False)
+        real_time = kwargs.get("real_time",False)
+        # @geomagixs_commons
+        # geomagixs_setup_commons, /QUIET
+        # geomagixs_check_system, /QUIET
+        # geomagixs_setup_dates, STATION=station, /QUIET, /FORCE_ALL
+
+        # geomagixs_check_gms, STATION=station, /QUIET
+        if initial is not None and final is not None:
+            check_dates(initial,final,gms=self.GMS,verbose=verbose,system=self.system)
+        if initial is None:
+            initial=self.system['today_date']
+        if final is None:
+            final = initial
+
+
+
+        #####3
+        initial_year = initial.year
+        initial_month = initial.month
+        initial_day  = initial.day
+
+        final_year = final.year
+        final_month = final.month
+        final_day = final.day
+
+
+        ####### Reading data files
+
+        month_number = (final_month-initial_month)+(final_year-initial_year)*12 + 1
+
+        files_number = (JULDAY(datetime(final_year,final_month,1)+relativedelta(months=+1)+relativedelta(days=-1))-JULDAY(initial-relativedelta(days=-1)))
+
+        data_deltah_name = numpy.empty(files_number,dtype='object')
+        data_kmex_name = numpy.empty(files_number,dtype='object')
+        data_profiles_name = numpy.empty( files_number,dtype='object')
+
+        string_date = numpy.empty(files_number,dtype='object')
+
+        extention = '.early' if real_time else '.final'
+
+        data_month_dh_name = numpy.empty(month_number,dtype='object')
+        data_month_k_name = numpy.empty(month_number,dtype='object')
+        data_month_prof_name = numpy.empty(month_number,dtype='object')
+
+        for i in range(month_number):
+            tmp_year = initial_year + (i+initial_month-1)//12
+            tmp_month = ((i+initial_month)%12) * ((i+initial_month % 12 !=0)) + (12)*((i + initial_month)%12==0)
+
+            string_date [i] = '{:4d}{:02d}'.format(tmp_year,tmp_month)
+
+            data_month_dh_name[i] = '{}_{}.delta_H{}'.format(self.GMS[self.system['gms']]['code'],string_date[i],extention)
+            data_month_k_name[i] = '{}_{}.k_index{}'.format(self.GMS[self.system['gms']]['code'],string_date[i],extention)
+            data_month_prof_name[i] = '{}_{}.profiles{}'.format(self.GMS[self.system['gms']]['code'],string_date[i],extention)
+
+        
+        ### verify if exists document4
+        # verificar path, creo que existe error en el origianl
+        fpaths = [ os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'],)]
+        exist_monthly_file 
+ 
     def __getting_local_qdays(self,initial,station= None,verbose=False,real_time=False):
         try:
             initial_year = initial.year
@@ -4303,7 +4681,7 @@ class geomagixs (object):
                 fname = self.GMS[self.system['gms']]['code']+'_????????.k_index.early'
                 
                 fpath = os.path.join(fpath,fname) 
-                
+                sdf
                 #buscamos archivos con el mismo patron
                 file_list = glob(fpath)   
                 
