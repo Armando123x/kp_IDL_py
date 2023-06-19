@@ -6,6 +6,7 @@ import numpy
 from scipy.signal import convolve
 from datetime import datetime
 import numbers 
+import glob
 
 months = ['jan','feb','mar','apr','may','jun','jul','aug','sep',\
                       'sep','oct','nov','dec']
@@ -194,3 +195,16 @@ def file_search(filename, directory):
     for root, dirs, files in os.walk(directory):
         if filename in files:
             return os.path.join(root, filename)        
+
+def searchforpatron(patron):
+    return glob.glob(patron)
+
+def FILE_LINES(lista):
+    buff = list()
+    for file in lista:
+
+        with open(file,'r') as f:
+
+            buff.append(len(f.readlines()))
+
+    return buff

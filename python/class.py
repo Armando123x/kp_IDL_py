@@ -158,7 +158,7 @@ class geomagixs (object):
 
             self.__magneticindex_compute(initial_date,final_date,station=self.GMS[self.system['gms']]['name'],force_all=force_all,real_time=real_time)
             
-
+            self.__magneticindex_monthlyfile(initial,date,station=self.GMS[self.system['gms']]['name'],force_all=force_all,real_time=real_time)
  
         #script -> geomagixs_quietdays_download.pro
             #falta codigo 170-173
@@ -2187,7 +2187,7 @@ class geomagixs (object):
             
         return 
     
-    def __geomagixs_magneticindex_monthlyfile(self,initial=None,final=None,**kwargs):
+    def __magneticindex_monthlyfile(self,initial=None,final=None,**kwargs):
         station = kwargs.get("station",None)
         verbose = kwargs.get("verbose",False)
         force_all = kwargs.get("force_all",False)
@@ -2248,8 +2248,43 @@ class geomagixs (object):
         
         ### verify if exists document4
         # verificar path, creo que existe error en el origianl
-        fpaths = [ os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'],)]
-        exist_monthly_file 
+        fpaths = [ os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'],file) for file in data_month_k_name]
+        exist_monthly_file = [os.path.isfile(file) and not force_all for file in fpaths]
+
+        capable_to_update = len(exist_monthly_file)
+        files_to_update = len(numpy.where(exist_monthly_file != True)[0])
+
+        if self.verbose or force_all is True:
+
+            if files_to_update > 0 :
+                print("Un total de {} archivo(s) necesitan ser actualizados.")
+
+            else:
+                print("No hay archivos requeridos a actualizar.")
+        
+            if capable_to_update > files_to_update:
+                print("Hay todavía {} archivo(s) que pueden ser actualizados. Usa el comando /FORCE_ALL para forzar la actualización.")
+
+        
+        for i in range(month_number):
+
+            if exist_monthly_file[i] == 0:
+                tmp_year,tmp_month,tmp_day = string_date[i][:4],string_date[i][4:6],string_date[i][-2:]
+                
+                tmp_year = int(tmp_year)
+                tmp_month = int(tmp_month)
+                tmp_day = int(tmp_day)
+
+
+                date = datetime(tmp_year,tmp_month,1)
+
+                self.__making_montlyfile_dh(date, station= self.GMS[self.system['gms']]['name'],verbose= verbose,real_time=real_time)
+                self.__making_montlyfile_k(date, station= self.GMS[self.system['gms']]['name'],verbose= verbose,real_time=real_time)
+
+        if verbose:
+            print("delta H-plot archivos fueron actualizados.")
+        
+        return 
  
     def __getting_local_qdays(self,initial,station= None,verbose=False,real_time=False):
         try:
@@ -4462,14 +4497,16 @@ class geomagixs (object):
             
             
                    
-    def __quietdays_download(self,initial,final, station=None,\
-                            verbose=False, force_all=False):
+    def __quietdays_download(self,initial,final, **kwargs):
         #script -> geomagixs_quietdays_download.pro
-        #falta
+        #listo
 
-        try:
+    
             update_flag=0
             
+            station = kwargs.get("station",None)
+            verbose = kwargs.get("verbose",False)
+            force_all = kwargs.get("force_all",False)
             
             #########
             # En IDL:
@@ -4479,7 +4516,7 @@ class geomagixs (object):
             
             final_date = final
             
-            files_number = int((final_date.year % 1000)-(initial_date % 1000))/10 +1
+            files_number = ((final_date.year % 1000)-(initial_date % 1000))//10 +1
             
             
             if verbose is True:
@@ -4517,9 +4554,9 @@ class geomagixs (object):
                 
                 if ((today_julian >= tmp_j0) and (today_julian <= tmp_j1)):
                     
-                    files_source_name_k [i] = 'qd{:4d}{:1d}x.txt'.format(tmp_year,int(tmp_decade/10))
+                    files_source_name_k [i] = 'qd{:04d}{:01d}x.txt'.format(tmp_year,int(tmp_decade/10))
                 else:    
-                    files_source_name_k [i] = 'qd{:4d}{:2d}.txt'.format(tmp_year,tmp_decade+9)
+                    files_source_name_k [i] = 'qd{:04d}{:02d}.txt'.format(tmp_year,tmp_decade+9)
 
                 directories_source_name[i]  = 'ftp://ftp.gfz-potsdam.de/pub/home/obs/kp-ap/quietdst/'
                 directories_destiny_name[i] = self.system['qdays_dir']
@@ -4535,8 +4572,8 @@ class geomagixs (object):
                 
                 
                 try:
-                    urllib.request.urlretrieve(url, archivo_destino)
-                except IOError as e:
+                    urllib.request.urlretrieve(fdownload, fsave)
+                except :
                     count_failed+=1
                 else:
                     count_saved+=1
@@ -4559,6 +4596,7 @@ class geomagixs (object):
             if (count_saved==0):
                 
                 SystemError("No se pudo descargar algún archivo [qdYYY0yy.txt].")
+                return 
             
             ###############################################################################
             # Format Quiet Days
@@ -4580,34 +4618,88 @@ class geomagixs (object):
             index_dates   = numpy.zeros(6)        
             
             
-            if os.access()
-            
-            
-            ##En las siguientes lineas se resume en generar un .date con 
-            # la fecha inicial y final 
-            #falta
-            
-                
-                
-                    
-                    
-                
-                
-            
-        except:
-            
-            print("Ocurrio un error en el modulo quietdays_download.")
-        
-        
+            patron = 'qd??????.txt'
+            path = self.system['qdays_dir']
 
-    def __setup_dates(self,update_file=None,station=None, quiet=False, force_all=False):
+            fpath = os.path.join(path,patron)    
+
+            qdays_files = searchforpatron(fpath)
+            qdays_files_number = len(qdays_files)
+            qdays_files_lines = FILE_LINES(qdays_files)
+            qdays_files_stringlength = [len(os.path.basename(file)) for file in qdays_files]
+
+
+            qdays_initial_year = int(os.path.basename(qdays_files[0])[:-6])            
+            qdays_final_year = int(os.path.basename(qdays_files[-1])[:-6])        
+
+            qdays_initial_year *=10
+            qdays_final_year *=10    
+            
+
+            qdays_final_year = qdays_final_year + ((qdays_files_lines[-1]-4)//14)
+
+            tmp_months = ((qdays_files_lines[-1]-4) % 14)
+
+            if tmp_months < 8 :
+                qdays_final_month = int(tmp_months)
+            else:
+                qdays_final_month = int(tmp_months-1)
+            
+            result = JULDAY(datetime(qdays_final_year,qdays_final_month,1)+relativedelta(days=-1)+relativedelta(months=+1))
+            result = CALDAT(result)
+
+            tmp_month = result.months
+            qdays_final_day = result.day
+            temporal_year = result.year
+
+            index_dates [:3] = [qdays_initial_year,1,1]
+            index_dates[3:] = [qdays_final_year,qdays_final_month,qdays_final_day]
+
+            file = os.path.join(self.system['auxilidar_dir'],'qdays.dates')
+
+            string_data = numpy.empty(2,dtype='object')
+
+            string_data[0]  = '# File with available data for quiet days [YYYYMMDD]-[YYYYMMDD]:'
+
+
+            chain0 = '{:04d}{:02d}{:02d}'.format(index_dates[0],index_dates[1],index_dates[2])
+            chain1 = '{:04d}{:02d}{:02d}'.format(index_dates[3],index_dates[4],index_dates[5])
+
+            string_data[1] = '{}-{}'.format(chain0,chain1)
+
+            with open(file,'w') as f:
+                
+                f.writelines(line+'\n' for line in string_data)
+
+            
+            if verbose:
+                print("Actualizado archivo qdays.dates")
+                print(" Rango de datos: ['{}'-{}]".format(chain0,chain1))
+             
+            if verbose:
+                print("Archivos q-days fueron actualizados.")
+
+             
+ 
+                
+                
+                    
+                    
+
+    def __setup_dates(self,**kwargs):
         #script -> geomagixs_setup_dates.pro
         #falta
         ###############################################
         ###variables
         ###
         ###############################################
-        
+
+        update_file = kwargs.get("update_file",False)
+        verbose = kwargs.get("verbose",False)
+        force_all = kwargs.get("force_all",False)
+
+        ###############################################################
+
         index_dates     =   numpy.zeros(6)
         index_dates_0   =   numpy.zeros(6)
         magnetic_dates  =   numpy.zeros(6)
@@ -4625,10 +4717,9 @@ class geomagixs (object):
                 print("Error critico: No es posible leer el archivo de datos GSM {}. \
                       Revisa los permisos de lectura.".format(self.GMS[self.system['gms']]['name']+'.dates'))
 
-            self.Error['value'][0]+=1
-            self.Error['log']+='GMS file '+self.GMS[self.system['gms']]['name']+'.dates'+' not found or reading permission conflict.  Use /update_file to fix it.'
-        
+
         else:
+
             fpath = self.system['auxiliar_dir']
             fname = self.GMS[self.system['gms']]['name']+'.dates'
             
@@ -5161,7 +5252,7 @@ class geomagixs (object):
 
         #archivo -> geomagixs_setup.pro
         #funcion -> PRO geomagixs_setup_commons, QUIET=quiet
-        #revisar si está terminado
+   
 
 
         if(self.Flag_setup == False):
@@ -5209,7 +5300,7 @@ class geomagixs (object):
                 'setup_file'        : '', # setup data file
                 'log'               : '',   
                 'qdays_dates'       : numpy.zeros((2,3)), 
-                'today_date'        : None, 
+                'today_date'        : datetime.now(), 
                 'contact1_mail'     : '',  
                 'contact2_mail'     : 'armando.castro.c@uni.pe',  
                 'ssh_on'            : 0,#ssh Activated [1] Not Activated [0] 
@@ -5231,14 +5322,11 @@ class geomagixs (object):
             #
             self.system['geomagixs_dir']=os.getcwd()
 
-            self.system['today_date'] = datetime.now().time()
-            
-
-
+           
             self.Flag_setup =True
 
 
-         #final 
+        return 
 
     
         
