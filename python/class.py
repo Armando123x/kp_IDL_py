@@ -4713,7 +4713,7 @@ class geomagixs (object):
 
         if os.access(fpath,os.R_OK):
 
-            if quiet is True:
+            if verbose:
                 print("Error critico: No es posible leer el archivo de datos GSM {}. \
                       Revisa los permisos de lectura.".format(self.GMS[self.system['gms']]['name']+'.dates'))
 
@@ -4753,12 +4753,12 @@ class geomagixs (object):
                     
                 
                 
-                if quiet is True:
+                if verbose:
                     print("Data cargada de {}.dates file".format(self.GMS[self.system['gms']]['name']))
             
             else:
                 if (update_file is True):
-                    if quiet is True:
+                    if verbose:
                         print("Warning: Imposible de leer archivos de datos GMS. {}.\
                             Se está intentando generar el archivo.".format(self.GMS[self.system['gms']]['name']))
                     
@@ -4772,9 +4772,27 @@ class geomagixs (object):
                 fname = self.GMS[self.system['gms']]['code']+'_????????.k_index.early'
                 
                 fpath = os.path.join(fpath,fname) 
-                sdf
                 #buscamos archivos con el mismo patron
-                file_list = glob(fpath)   
+                lista = searchforpatron(fpath)
+                total_files = len(lista)
+                expected_number = 0
+                str_length1 = len(os.path.expanduser(os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]))) + len('/'+self.GMS[self.system['gms']]['code']+'_')
+                
+                str_length2 = len('.k_index.early') + len(os.path.expanduser(os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'])))+len("/"+self.GMS[self.system['gms']]['code']+'_')
+
+                n1 = len(str(str_length1))
+                n2 = len(str(str_length2))
+
+                tmp_str1 = ":'n1'} ".format(str_length1)
+                tmp_str2 = "{:'n2'} ".format(str_length2)
+
+                if total_files > 0 :
+
+
+
+           
+
+                tmp_str1 = str_length1 <10 
                 
                 
                 directory = os.path.join(os.path.expanduser("~"), "output", "data")
