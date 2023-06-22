@@ -10,8 +10,7 @@ Puedes revisar el formato IAGA-2002 para el compartimiento de archivos
 https://www.ngdc.noaa.gov/IAGA/vdat/IAGA2002/iaga2002format.html
 
 
-'''
-import geomagixs_commons
+''' 
 import numpy
 import os 
 import subprocess
@@ -41,33 +40,6 @@ from dateutil.relativedelta import relativedelta
 
  
 
-
-def ReadCalibration(system,gms):
-    #script ->ReadCalibration
- 
-    calibration_name=gms[system['gms']]['name']+'.calibration'
-
-    file = file_search(system['auxiliar_dir'],calibration_name)
-
-    if file:
-        #abrimos el archivo
-
-        with open(file,'r') as f:
-            lines = f.readlines()
-            for line in lines:
-
-                if line[0] != "#":
-                    line    = line.strip().split()
-
-                    if (len(line)!=28):
-                        ValueError("Se debe de verificar los archivos de calibración.")
-                    
-                    else:
-                        return numpy.array(line,dtype=float)
-
-    else:
-        print('No se encontraron archivos de calibración.')
-
  
 class geomagixs (object):
 
@@ -94,17 +66,11 @@ class geomagixs (object):
 
 
     def __init__(self,**kwargs):
-        #definiremos algo aqui 
+ 
         # Se define la funcion geomagixs.pro
-        #falta
+   
         try:
-            #falta imprimir el tiempo 
-            #
-            #
-            #
-            #
-
-            ################################################
+ 
 
 
             verbose= kwargs.get('verbose',False)
@@ -112,27 +78,19 @@ class geomagixs (object):
             real_time = kwargs.get('real_time',False)
 
             initial_date = kwargs.get('initial_date',None)
-            final_date = kwargs.get('final_date',False)
+            final_date = kwargs.get('final_date',None)
 
             ##############################################################
             keys=kwargs.keys()
 
-            if (len(keys)<2 or (len(keys)!=3)):
-                raise AttributeError("Revise que los parametros proporcionados sean lo necesario.")
+ 
 
             working_dir =   kwargs.get('working_dir')
             gms_stn     =   kwargs.get("gms_stn")
             real_time   =   0 
 
-            if (len(keys)==3):
-                if ('-REAL_TIME'==gms_stn.upper()):
-                    real_time=1
-                else:
-                    return 
-            #falta
-            #Falta definir directorio 
-            #lineas 96-99
-
+ 
+            
             self.__setup__commons()
             self.__check_system()
 
@@ -158,7 +116,7 @@ class geomagixs (object):
 
             self.__magneticindex_compute(initial_date,final_date,station=self.GMS[self.system['gms']]['name'],force_all=force_all,real_time=real_time)
             
-            self.__magneticindex_monthlyfile(initial,date,station=self.GMS[self.system['gms']]['name'],force_all=force_all,real_time=real_time)
+            self.__magneticindex_monthlyfile(initial_date,final_date,station=self.GMS[self.system['gms']]['name'],force_all=force_all,real_time=real_time)
  
         #script -> geomagixs_quietdays_download.pro
             #falta codigo 170-173
@@ -173,6 +131,46 @@ class geomagixs (object):
 
             raise AttributeError("Algo salio mal en el inicio del programa.")
     
+
+
+    def __ReadCalibration(self,):
+
+        calibration_name = os.path.join(self.system['auxiliar_dir'],self.GMS[self.system['gms']]['name']+'.calibration')
+
+        exists = os.path.isfile(calibration_name)
+
+        if not exists:
+            print("Archivos de calibración no ha sido encontrado.")
+
+            return 
+        
+        result = numpy.empty(28,dtype=float)
+
+        dat_str = {'z':0}
+        
+        tmp_var = numpy.empty(28, dtype=object)
+        tmp_var.fill(dat_str)
+
+        else:
+
+            with open(calibration_name,'r') as file:
+                buff = file.readlines()
+                for linea in buff:
+                    valores = re.findall(r'\d+\.?\d*', linea)
+                    # Convertir los valores a enteros o números de punto flotante según corresponda
+                    valores = [int(v) if v.isdigit() else float(v) for v in valores]
+
+                    if len(valores)>10:
+                        result = numpy.array(valores)
+                    else:
+                        result = numpy.zeros(8)
+
+        return result 
+                                            
+        
+
+
+
     def __getting_deltab(self,initial,**kwargs):
 
         verbose = kwargs.get('verbose',False)
@@ -895,10 +893,9 @@ class geomagixs (object):
 
         
         for i in range(make_update_file):
-            if make_update_file[i] == 1
-
-            tmp_year, tmp_month,tmp_day = int(string_date[:4]),int(string_date[4:6]),int(string[6:8])
-            date = datetime(tmp_year,tmp_month,tmp_day)
+            if make_update_file[i] == 1:
+                tmp_year, tmp_month,tmp_day = int(string_date[:4]),int(string_date[4:6]),int(string_date[6:8])
+                date = datetime(tmp_year,tmp_month,tmp_day)
             if station != 'planetary':
                 self.__getting_kindex(date,verbose=verbose,station=station,real_time=real_time)
                 self.__getting_deltahindex(date,verbose=verbose,station=station,real_time=real_time)
@@ -1237,7 +1234,7 @@ class geomagixs (object):
                         H_median_value = numpy.median(H_values[no_gaps[i+1:elements_of_no_gaps-1]])
                         H_sigma_value  = numpy.std(H_values[no_gaps[i+1:elements_of_no_gaps-1]]-H_median_value )
 
-                        F_median_value = numpy.median(F_values[no_gaps[i+1:elements_of_no_gaps-1]])))
+                        F_median_value = numpy.median(F_values[no_gaps[i+1:elements_of_no_gaps-1]])
                         F_sigma_value  = numpy.std(F_values[no_gaps[i+1:elements_of_no_gaps-1]]-F_median_value )
                     
                     if i == elements_of_no_gaps-1:
@@ -1593,7 +1590,7 @@ class geomagixs (object):
         if offset is not None and isinstance(offset,list):
             offset = numpy.array(offset)
         
-        if offset is not None and isinstance(offset,numpy.ndarray)
+        if offset is not None and isinstance(offset,numpy.ndarray):
 
             if offset.shape[0] !=3:
                 raise ValueError("Valores inconsistentes o invalidos para el atributo OFFSET")
@@ -4706,65 +4703,60 @@ class geomagixs (object):
         magnetic_dates1 =   numpy.zeros(6)
         magnetic_dates2 =   numpy.zeros(6)
         
-        if ((self.Flag_dates is True) and (update_file is None) and (force_all is False)):
+        if ((self.Flag_dates is True) and (update_file is False) and (force_all is False)):
             return 
         
         fpath=os.path.join(self.system['auxiliar_dir'],self.GMS[self.system['gms']]['name']+'.dates')
 
-        if os.access(fpath,os.R_OK):
+        check_directory(fpath,verbose)
 
+
+
+        fpath = self.system['auxiliar_dir']
+        fname = self.GMS[self.system['gms']]['name']+'.dates'
+        
+        fpath = os.path.join(fpath,fname)
+        
+        exists = os.path.isfile(fpath)
+        
+        #revisar
+        if exists and (update_file is not True):
+            #archivo encontrado 
+            
+            buff_array=list()
+            with open(fpath,'r') as f:
+                for line in f.readlines():
+                    if line[0]!="#":
+                        buff_array.append(line)
+            
+                f.close()
+            
+            for n in range(3):
+                
+                tmp = [str(int(x)).zfill(6) for x in buff_array[n].strip("- ").split()]
+                tmp = numpy.array([(int(tmp[x][:4]),int(tmp[x][4:6]),int(tmp[x][6:8])) for x in [0,1]])
+                
+                if n==0:
+                    index_dates = tmp 
+                elif n==1:
+                    index_dates_0 = tmp
+                elif n==2:
+                    magnetic_dates = tmp
+                
+            
+            
             if verbose:
-                print("Error critico: No es posible leer el archivo de datos GSM {}. \
-                      Revisa los permisos de lectura.".format(self.GMS[self.system['gms']]['name']+'.dates'))
-
-
+                print("Data cargada de {}.dates file".format(self.GMS[self.system['gms']]['name']))
+        
         else:
-
-            fpath = self.system['auxiliar_dir']
-            fname = self.GMS[self.system['gms']]['name']+'.dates'
-            
-            fpath = os.path.join(fpath,fname)
-            
-            file = file_search(fname,fpath)
-            
-            #revisar
-            if file and (update_file is True):
-                #archivo encontrado 
-                
-                buff_array=list()
-                with open(file,'r') as f:
-                    for line in f.readlines():
-                        if line[0]!="#":
-                            buff_array.append(line)
-                
-                    f.close()
-                
-                for n in range(3):
-                    
-                    tmp = [str(int(x)).zfill(6) for x in buff_array[n].strip("- ").split()]
-                    tmp = numpy.array([(int(tmp[x][:4]),int(tmp[x][4:6]),int(tmp[x][6:8])) for x in [0,1]])
-                    
-                    if n==0:
-                        index_dates = tmp 
-                    elif n==1:
-                        index_dates_0 = tmp
-                    elif n==2:
-                        magnetic_dates = tmp
-                    
-                
-                
+            if (update_file is False):
                 if verbose:
-                    print("Data cargada de {}.dates file".format(self.GMS[self.system['gms']]['name']))
-            
-            else:
-                if (update_file is True):
-                    if verbose:
-                        print("Warning: Imposible de leer archivos de datos GMS. {}.\
-                            Se está intentando generar el archivo.".format(self.GMS[self.system['gms']]['name']))
-                    
-                    self.Error['value'][3]+=1
-                    self.Error['log']+= 'Input data file '+self.GMS[self.system['gms']]['name']+'.dates'+' not found or reading permission conflict. '
-                    
+                    print("Warning: Imposible de leer archivos de datos GMS. {}.\
+                        Se está intentando generar el archivo.".format(self.GMS[self.system['gms']]['name']))
+                
+                self.Error['value'][3]+=1
+                self.Error['log']+= 'Input data file '+self.GMS[self.system['gms']]['name']+'.dates'+' not found or reading permission conflict. '
+                
                     
             if (self.GMS[self.system['gms']]['name']!="planetary"):
                 
@@ -4773,9 +4765,9 @@ class geomagixs (object):
                 
                 fpath = os.path.join(fpath,fname) 
                 #buscamos archivos con el mismo patron
-                lista = searchforpatron(fpath)
-                total_files = len(lista)
-                expected_number = 0
+                file0 = searchforpatron(fpath)
+                total_files = len(file0)
+ 
                 str_length1 = len(os.path.expanduser(os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]))) + len('/'+self.GMS[self.system['gms']]['code']+'_')
                 
                 str_length2 = len('.k_index.early') + len(os.path.expanduser(os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'])))+len("/"+self.GMS[self.system['gms']]['code']+'_')
@@ -4783,14 +4775,22 @@ class geomagixs (object):
                 n1 = len(str(str_length1))
                 n2 = len(str(str_length2))
 
-                tmp_str1 = ":'n1'} ".format(str_length1)
-                tmp_str2 = "{:'n2'} ".format(str_length2)
+                tmp_str1 = "{:n1} ".format(str_length1)
+                tmp_str2 = "{:n2} ".format(str_length2)
 
                 if total_files > 0 :
 
+                    expected_number = JULDAY(datetime(tmp[4],tmp[5],tmp[6])) -JULDAY(datetime(tmp[0],tmp[1],tmp[2]))+1
+                    buff = []
+                    for file in [file0[0],file0[-1]]:
+                        with open(file,'r') as file:
+                            re.findall(r'\d+\.?\d*', linea)
+                            # Convertir los valores a enteros o números de punto flotante según corresponda
+                            valores = [int(v) if v.isdigit() else float(v) for v in valores]
 
 
-           
+
+            
 
                 tmp_str1 = str_length1 <10 
                 
@@ -4807,25 +4807,31 @@ class geomagixs (object):
                 # falta linea  150 -> 
                 
             
-                        
+                            
+                    
+                    
+                
+    
                 
                 
-            
- 
-            
-            
             
 
-    def __check_gms(self,station=None,quiet=False,force_all=False):
+    def __check_gms(self,kwargs**):
         #script -> geomaxis_check_gms.pro
         #está listo
         
         try:
+ 
+            station = kwargs.get("station",None)
+            verbose = kwargs.get("verbose",False)
+            force_all  = kwargs.get("force_all",False)
+
+
             
-            if (len(station)==0):
+            if station is None:
                 station = self.GMS[self.system['gms']]['name']
 
-                if quiet is True:
+                if verbose is True:
                     print('Configurando'+self.GMS[self.system['gms']]['name']+'como\
                           la estación GMS por defecto.')
                     
@@ -4843,7 +4849,7 @@ class geomagixs (object):
 
                         if (((ind1<0 and ind2<0)) or ((ind1>= ind2) and(ind2>= self.system['gms_total']))):
                             
-                            if quiet is True:
+                            if verbose is True:
                                 print("Error critico: GMS seleccionado {} no está disponible.\
                                     Revisa la lista de GMS disponibles.".format(station))
                                 
@@ -4857,7 +4863,7 @@ class geomagixs (object):
                             self.system['gms'] = station_number
                             station=self.GMS[self.system['gms']]['name']
                             
-                            if (quiet is True) and (self.GMS[self.system['gms']]['check_flag']==0):
+                            if (verbose is True) and (self.GMS[self.system['gms']]['check_flag']==0):
 
                                 print('Configurando ',self.GMS[self.system['gms']]['name'], 'como estación GMS.')
 
@@ -4869,7 +4875,7 @@ class geomagixs (object):
 
                 if os.access(fpath,os.R_OK) is False:
 
-                    if quiet is True:
+                    if verbose:
 
                         print("Error critico: Incapaz de leer archivo auxiliar {}. Es obligatorio otorgar los permisos de lectura.".format(self.GMS[self.system['gms']]['name']+".calibration"))
 
@@ -4879,7 +4885,7 @@ class geomagixs (object):
                     self.Error['log']+="Auxiliar file  "+self.GMS[self.system['gms']]['name']+ '.calibration'+" not found or read permissions conflict. "
 
 
-                tmp_calibration = ReadCalibration()
+                tmp_calibration = self.__ReadCalibration()
                 self.GMS[self.system['gms']]['calibration']  = tmp_calibration
 
             
@@ -4887,7 +4893,7 @@ class geomagixs (object):
             ###########################################################################
             fpath=os.path.join(self.system['datasource_dir'],self.GMS[self.system['gms']]['name'])
             if os.access(fpath,os.R_OK) is False:
-                if quiet is False:
+                if verbose:
 
                     print("Error crítico: Incapaz de leer el directorio {}. Es obligatorio permisos de lectura dentro del directorio.".format(fpath))
                 
@@ -4899,7 +4905,7 @@ class geomagixs (object):
 
             fpath=os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'])
             if os.access(fpath,os.W_OK) is False:
-                if quiet is False:
+                if verbose:
 
                     print("Error crítico: Incapaz de escribir el directorio {}. Es obligatorio permisos de lectura dentro del directorio.".format(fpath))
                 
@@ -4911,7 +4917,7 @@ class geomagixs (object):
             fpath=os.path.join(self.system['plots_dir'],self.GMS[self.system['gms']]['name'])
 
             if os.access(fpath,os.W_OK) is False:
-                if quiet is False:
+                if verbose:
 
                     print("Error crítico: Incapaz de escribir el directorio {}. Es obligatorio permisos de lectura dentro del directorio.".format(fpath))
                 
@@ -4922,7 +4928,7 @@ class geomagixs (object):
             fpath=os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'])
             
             if os.access(fpath,os.W_OK) is False:
-                if quiet is False:
+                if verbose:
 
                     print("Error crítico: Incapaz de escribir el directorio {}. Es obligatorio permisos de lectura dentro del directorio.".format(fpath))
                 
@@ -4933,7 +4939,7 @@ class geomagixs (object):
             self.GMS[self.system['gms']]['check_flag']=1
         
 
-            if quiet is False:
+            if verbose:
                 print("Estación geomagnetica {} está listo".format(self.GMS[self.system['gms']]['name']))
 
         except:
@@ -5011,38 +5017,18 @@ class geomagixs (object):
                             if verbose is True:
                                 print("Revisando arbol del directorio {}".format(input_dir))
 
-                            if os.access(input_dir, os.R_OK) is False:
-                                #No se tiene permisos para escribir
 
-                                if verbose is True:
-                                    print("Error critico: Imposible de leer la carpeta 'input' del \
-                                          directorio '{}'. Es obligatorio conceder los permisos de \
-                                          lectura del directorio 'input'".format(input_dir))
-                                
-                                self.Error['value'][0]+=1
-                                self.Error['log']+='Input directory '+input_dir+' not found or reading permission conflict. '
+                            key = check_directory(input_dir,verbose)
 
                             
-                            self.system['input_dir']=input_dir
+                            if key: self.system['input_dir']=input_dir
  
                             #revisamos si tiene permisos la carpeta auxiliar
 
                             auxiliar_dir = buff_array[1]
 
-                            if os.access(auxiliar_dir, os.R_OK) is False:
-
-                                if verbose is True:
-                                    print("Error critico: Imposible de leer la carpeta 'auxiliar' del \
-                                          directorio '{}'. Es obligatorio conceder los permisos de \
-                                          lectura del directorio 'auxiliar'".format(auxiliar_dir))
-                                    
-
-                                self.Error['value'][0]+=1
-                                self.Error['log']+='Auxiliar directory '+input_dir+' not found or reading permission conflict. '
-
-
+                            key = check_directory(auxiliar_dir)
  
-
                             ###datasource_dir
 
                             #Carpeta con datos magneticos
@@ -5053,19 +5039,7 @@ class geomagixs (object):
                                                             else  os.path.join(self.system['input_dir'],self.system['datasource_dir'])
                             
 
-                            if os.access(self.system['datasource_dir'], os.R_OK) is False:
-                                
-
-                                if verbose is True:
-                                    print("Error critico: Imposible de leer la carpeta 'auxiliar' del \
-                                          directorio '{}'. Es obligatorio conceder los permisos de \
-                                          lectura del directorio 'auxiliar'".format(self.system['datasource_dir']))
-                                    
-                                self.Error['value'][0]+=1
-
-                                self.Error['log']+='Magnetic data source directory '+self.system['datasource_dir']+' not found or read permission conflict. '
-
-
+                            key = check_directory(self.system['datasource_dir'])
 
                             #file qdays
                         
@@ -5075,17 +5049,7 @@ class geomagixs (object):
                                                             else  os.path.join(self.system['datasource_dir'],self.system['qdays_dir'])
                             
 
-                            if os.access(self.system['qdays_dir'], os.R_OK) is False:
-
-                                if verbose is True:
-
-                                    print("Error critico: Imposible de leer la carpeta 'qdays' del \
-                                          directorio '{}'. Es obligatorio conceder los permisos de \
-                                          lectura del directorio 'qdays'".format(self.system['qdays_dir']))
-                                    
-                                self.Error['value'][0]+=1
-                                self.Error['log']+= 'Input data directory '+self.system['qdays_dir']+' not found or read permission conflict. '
-
+                            check_directory(self.system['qdays_dir'])
                             #comprobamos permisos de escritura para el directorio de salida
                             # 
                             #     
@@ -5095,17 +5059,8 @@ class geomagixs (object):
                             if verbose:
                                 print('Revisando arbol del directorio de salida {}.'.format(self.system['output_dir']))
 
-                            if os.access(output_dir, os.R_OK) is False:
 
-                                if verbose is True:
-
-                                    Warning("Error critico: Imposible de leer la carpeta 'output' del \
-                                          directorio '{}'. Es obligatorio conceder los permisos de \
-                                          lectura del directorio 'output'".format(output_dir))
-                                    
-                                self.Error['value'][0]+=1
-                                self.Error['log']+= 'Input data directory '+output_dir+' not found or read permission conflict. '
-
+                            check_directory(output_dir,verbose)
                             
 
 
@@ -5116,53 +5071,22 @@ class geomagixs (object):
                                                             else  os.path.join(self.system['output_dir'],self.system['indexes'])
 
                             
-                            if os.access(self.system['indexes_dir'], os.R_OK) is False:
-
-                                if verbose:
-
-                                    Warning("Error critico: Imposible de leer la carpeta 'indexes_directory' del \
-                                          directorio '{}'. Es obligatorio conceder los permisos de \
-                                          lectura del directorio 'indexes_directory'".format(self.system['indexes_dir']))
-                                    
-                                self.Error['value'][0]+=1
-                                self.Error['log']+= 'Computed indexes directory '+self.system['indexes_dir']+' not found or writing permission conflict. '
-                            
+                            check_directory(self.system['indexes_dir'])
                             ######
 
                             self.system['plots_dir']=os.path.join(self.system['output_dir'],"plots") \
                                                             if (self.system['plots_dir'] == '') \
                                                             else  os.path.join(self.system['output_dir'],self.system['plots_dir'])
                                 
-                            if os.access(self.system['plots_dir'], os.W_OK) is False:
-                                
-                                if verbose:
-
-                                    print("Error critico: Imposible de poder escribir la carpeta 'plots' del \
-                                          directorio '{}'. Es obligatorio conceder los permisos de \
-                                          escritura del directorio 'plots'".format(self.system['plots_dir']))
-                                    
-                                self.Error['value'][0]+=1
-                                self.Error['log']+= 'Plots directory '+self.system['plots_dir']+' not found or writing permission conflict. '
-
-                            
+                            check_directory(self.system['plots_dir'],verbose,'w')
                             ######                            
 
                             self.system['procesed_dir']=os.path.join(self.system['output_dir'],"processed") \
                                                             if (self.system['procesed_dir'] == '') \
                                                             else  os.path.join(self.system['output_dir'],self.system['processed_dir'])
                                 
-                            if os.access(self.system['plots_dir'], os.W_OK) is False:
-                                
-                                if verbose:
 
-                                    print("Error critico: Imposible de poder escribir la carpeta 'plots' del \
-                                          directorio '{}'. Es obligatorio conceder los permisos de \
-                                          escritura del directorio 'plots'".format(self.system['plots_dir']))
-                                    
-                                self.Error['value'][0]+=1
-                                self.Error['log']+= 'Processed files directory '+self.system['processed_dir']+' not found or writing permission conflict. '
-
-
+                            check_directory(self.system['procesed_dir'],verbose,'w')
 
                             ######################################################################################
 
@@ -5263,16 +5187,16 @@ class geomagixs (object):
  
 
 
-    def __setup__commons(self,quiet=False):
+    def __setup__commons(self,**kwargs):
 
         #archivo -> geomagixs_setup.pro
         #funcion -> PRO geomagixs_setup_commons, QUIET=quiet
    
-
+        verbose = kwargs.get("verbose",False)
 
         if(self.Flag_setup == False):
 
-            if (quiet is True):
+            if (verbose):
 
                 print("Configurando ...")
             

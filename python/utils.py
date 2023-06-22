@@ -208,3 +208,26 @@ def FILE_LINES(lista):
             buff.append(len(f.readlines()))
 
     return buff
+
+
+
+
+def check_directory(path_dir,verbose= False,type_='r'):
+
+    value,action = os.R_OK,'leer' if type=='r' else os.W_OK,'escribir'
+    
+    if not os.path.exists(path_dir):
+        if verbose:
+            print("Directorio {} no existe. Se creará con el directorio vacio.".format(path_dir))
+
+        os.makedirs(os.path.dirname(path_dir))
+    
+    if not (path_dir,value) :
+        if verbose is True:
+            print("Error critico: Imposible de {} la carpeta 'input' del \
+                directorio '{}'. Es obligatorio conceder los permisos de \
+                lectura del directorio 'input'".format(action,path_dir))
+            
+        return False
+
+    return True
