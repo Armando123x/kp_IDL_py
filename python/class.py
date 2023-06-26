@@ -69,7 +69,7 @@ class geomagixs (object):
  
         # Se define la funcion geomagixs.pro
    
-        try:
+ 
  
 
 
@@ -98,7 +98,7 @@ class geomagixs (object):
             #falta asegurar que datos sean string
             self.__check_gms(station=gms_stn)
 
-            self.__setup_dates( )
+            self.__setup_dates(station=station, force_all=force_all,update_file= update_file)
                                
             self.__quietdays_download(initial=initial_date,final= final_date,verbose=verbose)
             station = self.GMS[self.system['gms']]['name']
@@ -117,22 +117,76 @@ class geomagixs (object):
             self.__magneticindex_compute(initial_date,final_date,station=self.GMS[self.system['gms']]['name'],force_all=force_all,real_time=real_time)
             
             self.__magneticindex_monthlyfile(initial_date,final_date,station=self.GMS[self.system['gms']]['name'],force_all=force_all,real_time=real_time)
- 
-        #script -> geomagixs_quietdays_download.pro
-            #falta codigo 170-173
-            #falta
-            #falta
-        
-        
 
 
+            self.__setup_dates(station=station, force_all=force_all,update_file= update_file)
+            #######
+            # No se define los scripts de ploteo
+            # geomagixs_magneticindex_plotk, initial_date, final_date, STATION=gms[system.gms].name, /force_all, REAL_TIME=real_time
+                
+            # 	geomagixs_magneticindex_plotdh, initial_date, final_date, STATION=gms[system.gms].name, /force_all, REAL_TIME=real_time
+                    
+            # 	geomagixs_magneticindex_plotb, initial_date, final_date, STATION=gms[system.gms].name, /force_all, REAL_TIME=real_time
+            
+            ####################################3
 
-        except:
+            datatype = 'realtime' if real_time else 'final'
 
-            raise AttributeError("Algo salio mal en el inicio del programa.")
+            datatype = '' if self.GMS[self.system['gms']]['code'] == 'pla' else datatype
+
+            if real_time:
+                extention = '' if self.GMS[self.system['gms']]['code'] == 'pla' else '.early'
+
+
+            result = datetime.now()
+
+            Y,M,D = result.year,result.month,result.day
+
+
+            dst_month_file = '{}_{:4d}{:02d}.delta_H{}'.format(self.GMS[self.system['gms']]['code'],extention)
+            kmex_monthly_file =     '{}_{:4d}{:02d}.k_index{}'.format(self.GMS[self.system['gms']]['code'],extention)
+            
+            fpath = os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'],dst_month_file)
+            ftopath = os.path.join("/publicdata/",self.GMS[self.system['gms']]['name'],datatype+dst_month_file,)
+            command = "sshpass -p {} scp {} {}@{}:".format(self.system['ftp_password'],fpath,self.system['ftp_user'],ftopath)
+
+            execute_command(command)                    
+
+            fpath = os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'],kmex_monthly_file)
+            ftopath = os.path.join("/publicdata/",self.GMS[self.system['gms']]['name'],datatype+kmex_monthly_file,)
+            command = "sshpass -p {} scp {} {}@{}:".format(self.system['ftp_password'],fpath,self.system['ftp_user'],ftopath)
+
+            execute_command(command)              
+
+
+            result = JULDAY(final_date) - 6 
+            result = CALDAT(result)
+
+            tmp_y,tmp_m,tmp_d = result.year , result.month, result.day
+
+            if self.GMS[self.system['gms']]['code'] == 'pla':
+                dst_today_plot = '{}_{:4d}{:02d}{:02d}_07days.dH.png'.format(self.GMS[self.system['gms']]['code'],tmp_y,tmp_m,tmp_d)
+                kmex_today_plot = '{}_{:4d}{:02d}{:02d}_07days.k.png'.format(self.GMS[self.system['gms']]['code'],tmp_y,tmp_m,tmp_d)
+
+                dst_latest_plot  = 'latest_dst.png'
+                kmex_latest_plot = 'latest_kp.png'
+
+            else:
+                dst_today_plot = '{}_{:4d}{:02d}{:02d}_07days.dH.early.png'.format(self.GMS[self.system['gms']]['code'],tmp_y,tmp_m,tmp_d)
+                kmex_today_plot = '{}_{:4d}{:02d}{:02d}_07days.k.early.png'.format(self.GMS[self.system['gms']]['code'],tmp_y,tmp_m,tmp_d)
+                profiles_today_plot = '{}_{:4d}{:02d}{:02d}_07days.B.early.png'.format(self.GMS[self.system['gms']]['code'],tmp_y,tmp_m,tmp_d)
+
+                dst_latest_plot     = 'latest_{}_dh.png'.format(self.GMS[self.system['gms']]['code'])
+                kmex_latest_plot    = 'latest_{}_k.png'.format(self.GMS[self.system['gms']]['code'])
+                profile_latest_plot = 'latest_{}_B.png'.format(self.GMS[self.system['gms']]['code'])
+            
+
+
+            #### Se envia los archivos png por ftp, pero no se implementa.
+    
     
 
-
+ 
     def __ReadCalibration(self,):
 
         calibration_name = os.path.join(self.system['auxiliar_dir'],self.GMS[self.system['gms']]['name']+'.calibration')
@@ -151,19 +205,19 @@ class geomagixs (object):
         tmp_var = numpy.empty(28, dtype=object)
         tmp_var.fill(dat_str)
 
-        else:
+ 
 
-            with open(calibration_name,'r') as file:
-                buff = file.readlines()
-                for linea in buff:
-                    valores = re.findall(r'\d+\.?\d*', linea)
-                    # Convertir los valores a enteros o números de punto flotante según corresponda
-                    valores = [int(v) if v.isdigit() else float(v) for v in valores]
+        with open(calibration_name,'r') as file:
+            buff = file.readlines()
+            for linea in buff:
+                valores = re.findall(r'\d+\.?\d*', linea)
+                # Convertir los valores a enteros o números de punto flotante según corresponda
+                valores = [int(v) if v.isdigit() else float(v) for v in valores]
 
-                    if len(valores)>10:
-                        result = numpy.array(valores)
-                    else:
-                        result = numpy.zeros(8)
+                if len(valores)>10:
+                    result = numpy.array(valores)
+                else:
+                    result = numpy.zeros(8)
 
         return result 
                                             
@@ -189,7 +243,8 @@ class geomagixs (object):
         hour = [0,3,6,9,12,15,18,21]
 
         read_data = numpy.empty(8,dtype='objects')
-        read_data.fill(struct)
+        read_data = fill(read_data,struct)
+   
 
         for n,_ in enumerate(read_data):
             for key in keys:   
@@ -228,7 +283,7 @@ class geomagixs (object):
         result = dict.fromkeys(keys,0)
 
         for key in result.keys():
-            result[key] = vectorize(read_data,key)
+            result[key] = deepcopy(vectorize(read_data,key))
 
 
         return result 
@@ -313,8 +368,8 @@ class geomagixs (object):
         minutes_per_day = 1440
 
         read_data = numpy.empty(minutes_per_day,dtype='object')
-
-        read_data.fill(struct)
+        read_data = fill(read_data,struct)
+ 
 
         for i in range(24):
             read_data[i]['hour'] = i 
@@ -942,7 +997,8 @@ class geomagixs (object):
 
                 
                 resulting_data = numpy.empty(numpy.array(f.readlines(),dtype='object').shape[0],dtype='object')
-                resulting_data.fill(struct)
+                 
+                resulting_data = fill(resulting_data,struct)
                 for n,linea in enumerate(f.readlines()):
                     valores = re.findall(r'\d+\.?\d*', linea)
 
@@ -1032,7 +1088,7 @@ class geomagixs (object):
             for i in range(minutes_in_a_day):
                 diff = JULDAY(file_date)- JULDAY(datetime(initial_year,1,1)+relativedelta(days=-1))
                 chain = '{:4d}-{:02d}-{:02d} {:02d}:{:02d}:00.000{:03d}      {:7.2f} {:9.2f} {:9.2f} {:9.2f}'
-                final_file[i] = chain.format(tmp_year,tmp_month,tmp_day,i//60,i mod 60 , diff,9999.00, 999999.00, 999999.00, 999999.00)
+                final_file[i] = chain.format(tmp_year,tmp_month,tmp_day,i//60,i % 60 , diff,9999.00, 999999.00, 999999.00, 999999.00)
 
                 if exists: 
 
@@ -1673,17 +1729,30 @@ class geomagixs (object):
         return 
     
 
-    def __quietday_get(self,initial,station,verbose=False,real_time=False,force_all=False,local=None,statistic_qd=False):
+    def __quietday_get(self,**kwargs):
         #script geomagix_quietday_get
         #        @geomagixs_commons
         # geomagixs_setup_commons, /QUIET
         # geomagixs_check_system, /QUIET
         # geomagixs_setup_dates, STATION=station, /QUIET
+
+        #############################################
+
+        initial = kwargs.get("initial",None)
+        station = kwargs.get("station",None)
+        real_time = kwargs.get("real_time",False)
+        force_all = kwargs.get("force_all",False)
+        local = kwargs.get("local",False)
+        statistic_qd = kwargs.get("statistic_qd",False)
+        verbose = kwargs.get("verbose",False)
+
+
         if station == 'planetary':
             if verbose:
                 Warning("Inconsistencia: Las condiciones solicitidadas podrían comprometer\
                          los resultados calculados. Es imposible o innecesario calcular Q-day para planetary GMS.")
 
+    
   
         update_flag = 0 
 
@@ -1754,7 +1823,7 @@ class geomagixs (object):
     def __getting_magneticdata(self,initial,**kwargs):
         # script geomagixs_quietday_get.pro
         #listo 
-        try:
+ 
             
             verbose = kwargs.get('verbose',False)
             station = kwargs.get('station',None)
@@ -1785,8 +1854,8 @@ class geomagixs (object):
             struct = dict.fromkeys(keys,0)
 
             resulting = numpy.empty(magnetic_data.shape[0],dtype='object')
-            resulting.fill(struct)
-
+            resulting = fill(resulting,struct)
+ 
             for n,linea in enumerate(magnetic_data):
 
                 valores = re.findall(r'\d+\.?\d*', linea)
@@ -1801,8 +1870,7 @@ class geomagixs (object):
             return resulting
 
 
-        except:
-            print("Ocurrió un error en __getting_magneticdata.")
+ 
 
     def __reading_kmex_data(self,date,**kwargs):
 
@@ -2284,7 +2352,7 @@ class geomagixs (object):
         return 
  
     def __getting_local_qdays(self,initial,station= None,verbose=False,real_time=False):
-        try:
+ 
             initial_year = initial.year
             initial_month = initial.month
             initial_day = initial.day
@@ -2451,15 +2519,13 @@ class geomagixs (object):
 
             return resultado
 
-        except:
-
-            print("Ocurrio un error en __getting_local_qdays.")
+ 
     def __getting_statistic_quietday(self, initial, station= None, verbose=False,real_time=False,local=False):
         def get_values(result,x,y):
 
             pass
         
-        try:
+ 
 
 
 
@@ -2554,7 +2620,8 @@ class geomagixs (object):
             struct = dict.fromkeys(keys,0)
 
             qday = numpy.empty(minutes_per_day,dtype='object')
-            qday.fill(struct)
+            qday = fill(qday,struct)
+        
 
             time_days = numpy.arange(kmex_days_for_median)+1
 
@@ -2568,7 +2635,7 @@ class geomagixs (object):
 
                 if number_of_data[i]>= statistic_limit:
 
-
+                    result,status_result,tendency,delta = POLY_FIT(x,y,2)
  
                     if number_of_data[i] >= quadratic_limit:
 
@@ -2587,7 +2654,7 @@ class geomagixs (object):
                             tendency = numpy.polyval(result,x)
                             delta = numpy.std(tendency-y)
 
-                            status_result = numpy.isnan().any()
+                            status_result = numpy.isnan(result).any()
 
                             div = result[1]/delta[1]
                             flag = numpy.isnan(result[1]) & numpy.isnan(delta[1])
@@ -2872,9 +2939,6 @@ class geomagixs (object):
             
 
  
-        except:
-
-            return 
         
     
     def __getting_quietday(self,initial,station=None,verbose=False,real_time=False,local=None):
@@ -3563,7 +3627,8 @@ class geomagixs (object):
                 str_tmp = dict.fromkeys(keys,0)
 
                 index_data = numpy.empty(number_of_lines,dtype='object')
-                index_data.fill(str_tmp)
+                index_data = fill(index_data,str_tmp)
+ 
 
                 for n,linea in enumerate(number_of_lines):
 
@@ -3724,12 +3789,12 @@ class geomagixs (object):
 
 
         if verbose:
-            print("Archivos fueron procesados")
+            print("Los archivos fueron procesados")
 
 
     def __making_processeddatafiles(self,initial,**kwargs):
         
-        try:
+ 
             
             station = kwargs.get("station",None)
             verbose = kwargs.get("verbose",False)
@@ -3762,11 +3827,12 @@ class geomagixs (object):
             struct = dict.fromkeys(keys,0)
 
             total_magnetic_data = numpy.empty(minutes_per_day*N_days,dtype='object')
-            total_magnetic_data.fill(struct)
+            total_magnetic = fill(total_magnetic_data,struct)
+             
 
             magnetic_data = numpy.empty(minutes_per_day,dtype='object')
-            magnetic_data.fill(struct)
-
+            magnetic_data = fill(magnetic_data,struct)
+       
 
             total_time = numpy.arange(minutes_per_day*N_days)
 
@@ -3791,18 +3857,21 @@ class geomagixs (object):
                 if exist:
 
                     magnetic_data_tmp = self.__getting_magneticdata(initial,station=station,verbose=verbose)
+                    
+                    
+                    for number in range(minutes_per_day*(N_days-1-j),minutes_per_day*(N_days-j)):
 
-                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['D'] = numpy.array([tmp['D'] for tmp in magnetic_data_tmp])
-                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['H'] = numpy.array([tmp['H'] for tmp in magnetic_data_tmp])
-                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['Z'] = numpy.array([tmp['Z'] for tmp in magnetic_data_tmp])
-                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['F'] = numpy.array([tmp['F'] for tmp in magnetic_data_tmp])
+                        total_magnetic_data[number]['D'] = numpy.array([tmp['D'] for tmp in magnetic_data_tmp])
+                        total_magnetic_data[number]['H'] = numpy.array([tmp['H'] for tmp in magnetic_data_tmp])
+                        total_magnetic_data[number]['Z'] = numpy.array([tmp['Z'] for tmp in magnetic_data_tmp])
+                        total_magnetic_data[number]['F'] = numpy.array([tmp['F'] for tmp in magnetic_data_tmp])
 
-                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['year'] = numpy.array([tmp['year'] for tmp in magnetic_data_tmp])
-                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['month'] = numpy.array([tmp['month'] for tmp in magnetic_data_tmp])
-                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['day'] = numpy.array([tmp['day'] for tmp in magnetic_data_tmp])
-                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['hour'] = numpy.array([tmp['hour'] for tmp in magnetic_data_tmp])
-                    total_magnetic_data[minutes_per_day*(N_days-1-j):minutes_per_day*(N_days-j)-1]['minute'] = numpy.array([tmp['minute'] for tmp in magnetic_data_tmp])
-                
+                        total_magnetic_data[number]['year']     = numpy.array([tmp['year'] for tmp in magnetic_data_tmp])
+                        total_magnetic_data[number]['month']    = numpy.array([tmp['month'] for tmp in magnetic_data_tmp])
+                        total_magnetic_data[number]['day']      = numpy.array([tmp['day'] for tmp in magnetic_data_tmp])
+                        total_magnetic_data[number]['hour']     = numpy.array([tmp['hour'] for tmp in magnetic_data_tmp])
+                        total_magnetic_data[number]['minute']   = numpy.array([tmp['minute'] for tmp in magnetic_data_tmp])
+                    
                 else:
                     raise RuntimeError("Error: Imposible de leer el archivo {}. Es posible que el archivo no exista o haya conflictos de permisos.".format(kmex_file_name))
                 
@@ -3837,20 +3906,532 @@ class geomagixs (object):
             N_sigma = deepcopy(H_median)
 
             arc_secs_2rads = numpy.pi/(60*180)
-        ######### falta quietdaysget, nos quedamos aquiii 
-            qday_data = self.__quietda
+   
+            qday_data = self.__quietday_get(initial=initial,station=station,real_time=real_time,verbose=verbose)
+
+            mask = vectorize(total_magnetic_data,'H') < 999990
+            mask = mask.astype(bool)
+
+            days_count  = numpy.count_nonzero(mask)
+            valid_days = numpy.where(mask)[0]
+ 
+            mask = vectorize(total_magnetic_data[minutes_per_day*(N_days-1):minutes_per_day*(N_days)-1],'H') < 999990.00
+            mask = mask.astype('bool')
+            valid_minutes = numpy.where(mask)[0]
+            count = numpy.count_nonzero(mask)
+
+
+            if count > 2:
+                if days_count > minutes_per_day*0.6:
+
+                    ######################################################################
+                    key = 'D'
+
+                    for key in  ['D','H','Z','F','N']:
+                        x = total_time[valid_days]
+                        y = numpy.ravel(vectorize(total_magnetic_data[valid_days] , key))
+
+                                        
+                        fit = POLY_FIT(x,y,2)
+                        status_result  = fit.status_result
+
+
+                        if fit.status_result > 0:
+                            x = total_time[valid_days]
+                            y = numpy.ravel(vectorize(total_magnetic_data[valid_days] , key))
+
+                            fit = POLY_FIT(x,y,1)
+
+                            if fit.result[1]/fit.delta[1]:
+                                status_result = 1
+                        
+                        if status_result == 0:
+
+                            total_tendency = numpy.ravel(vectorize(total_magnetic_data),key)
+                            total_tendency[valid_days] = fit.tendency
+
+                            for indx in valid_days : total_magnetic_data[indx][key] -= fit.tendency 
+
+
+                            for indx in valid_minutes:
+                                magnetic_data[indx][key] = total_magnetic_data[minutes_per_day*(N_days-1) + indx][key] + total_tendency [minutes_per_day*(  N_days-1) + indx]
+                                if key == 'D': D_median[indx] = qday_data[indx][key] - numpy.median(vectorize(qday_data[valid_minutes],key) ) + total_tendency [minutes_per_day*(  N_days-1) + indx]
+                                if key == 'H': H_median[indx] = qday_data[indx][key] - numpy.median(vectorize(qday_data[valid_minutes],key) ) + total_tendency [minutes_per_day*(  N_days-1) + indx]
+                                if key == 'Z': Z_median[indx] = qday_data[indx][key] - numpy.median(vectorize(qday_data[valid_minutes],key) ) + total_tendency [minutes_per_day*(  N_days-1) + indx]
+                                if key == 'F': F_median[indx] = qday_data[indx][key] - numpy.median(vectorize(qday_data[valid_minutes],key) ) + total_tendency [minutes_per_day*(  N_days-1) + indx]
+                                if key == 'N': N_median[indx] = qday_data[indx][key] - numpy.median(vectorize(qday_data[valid_minutes],key) ) + total_tendency [minutes_per_day*(  N_days-1) + indx]
+
+                        else:
+                            
+                            for indx in valid_minutes:
+                                magnetic_data[indx][key] = total_magnetic_data[minutes_per_day*(N_days-1) + indx][key]
+                                if key == 'D': D_median[indx]  = qday_data[indx][key] - numpy.median(vectorize(qday_data[valid_minutes],'D')) + numpy.median(vectorize(magnetic_data[valid_minutes],key))
+                                if key == 'H': H_median[indx]  = qday_data[indx][key] - numpy.median(vectorize(qday_data[valid_minutes],'D')) + numpy.median(vectorize(magnetic_data[valid_minutes],key))
+                                if key == 'Z': Z_median[indx]  = qday_data[indx][key] - numpy.median(vectorize(qday_data[valid_minutes],'D')) + numpy.median(vectorize(magnetic_data[valid_minutes],key))
+                                if key == 'F': F_median[indx]  = qday_data[indx][key] - numpy.median(vectorize(qday_data[valid_minutes],'D')) + numpy.median(vectorize(magnetic_data[valid_minutes],key))
+                                if key == 'N': N_median[indx]  = qday_data[indx][key] - numpy.median(vectorize(qday_data[valid_minutes],'D')) + numpy.median(vectorize(magnetic_data[valid_minutes],key))
+
+                        if key =='D':    
+                            D_sigma[valid_minutes]  = numpy.ravel(vectorize(qday_data[valid_minutes],key))
+                            D_D[valid_minutes]      = (numpy.ravel(vectorize(magnetic_data[valid_minutes],key))-numpy.median(D_median[valid_minutes]))
+
+                        if key =='H':    
+                            H_sigma[valid_minutes]  = numpy.ravel(vectorize(qday_data[valid_minutes],key))
+                            D_H[valid_minutes]      = (numpy.ravel(vectorize(magnetic_data[valid_minutes],key))-numpy.median(D_median[valid_minutes]))
+                        if key =='Z':    
+                            Z_sigma[valid_minutes]  = numpy.ravel(vectorize(qday_data[valid_minutes],key))
+                            D_Z[valid_minutes]      = (numpy.ravel(vectorize(magnetic_data[valid_minutes],key))-numpy.median(D_median[valid_minutes]))
+                        if key =='F':    
+                            F_sigma[valid_minutes]  = numpy.ravel(vectorize(qday_data[valid_minutes],key))
+                            D_F[valid_minutes]      = (numpy.ravel(vectorize(magnetic_data[valid_minutes],key))-numpy.median(D_median[valid_minutes]))
+                        if key =='N':    
+                            N_sigma[valid_minutes]  = numpy.ravel(vectorize(qday_data[valid_minutes],key))
+                            D_N[valid_minutes]      = (numpy.ravel(vectorize(magnetic_data[valid_minutes],key))-numpy.median(D_median[valid_minutes]))
+
+
+                else:
+
+                    ### D  processs
+                    key = 'D'
+                    for indx in valid_minutes:
+                        magnetic_data[indx][key] = total_magnetic_data[minutes_per_day*(N_days-1)+indx][key]
+                    D_median[valid_minutes] = vectorize(qday_data[valid_minutes],key) - numpy.median(vectorize(qday_data[valid_minutes],key)) + numpy.median(magnetic_data['valid_minutes'],key)
+                    D_sigma[valid_minutes ] = vectorize(qday_data[valid_minutes],'dD')
+                    D_D[valid_minutes]   = (numpy.ravel(vectorize(magnetic_data[valid_minutes],key)))-\
+                                           (D_median[valid_minutes])
+         
+                    ### H  processs
+                    key = 'H'
+                    for indx in valid_minutes:
+                        magnetic_data[indx][key] = total_magnetic_data[minutes_per_day*(N_days-1)+indx][key]
+                    H_median[valid_minutes] = vectorize(qday_data[valid_minutes],key) - numpy.median(vectorize(qday_data[valid_minutes],key)) + numpy.median(magnetic_data['valid_minutes'],key)
+                    H_sigma[valid_minutes ] = vectorize(qday_data[valid_minutes],'dH')
+                    D_H[valid_minutes]   = (numpy.ravel(vectorize(magnetic_data[valid_minutes],key)))-\
+                                           (H_median[valid_minutes])
+         
+                    ### Z  processs
+                    key = 'Z'
+                    for indx in valid_minutes:
+                        magnetic_data[indx][key] = total_magnetic_data[minutes_per_day*(N_days-1)+indx][key]
+                    Z_median[valid_minutes] = vectorize(qday_data[valid_minutes],key) - numpy.median(vectorize(qday_data[valid_minutes],key)) + numpy.median(magnetic_data['valid_minutes'],key)
+                    Z_sigma[valid_minutes ] = vectorize(qday_data[valid_minutes],'dZ')
+                    D_Z[valid_minutes]   = (numpy.ravel(vectorize(magnetic_data[valid_minutes],key)))-\
+                                           (Z_median[valid_minutes])
+         
+                    ### F  processs
+                    key = 'F'
+                    for indx in valid_minutes:
+                        magnetic_data[indx][key] = total_magnetic_data[minutes_per_day*(N_days-1)+indx][key]
+                    F_median[valid_minutes] = vectorize(qday_data[valid_minutes],key) - numpy.median(vectorize(qday_data[valid_minutes],key)) + numpy.median(magnetic_data['valid_minutes'],key)
+                    F_sigma[valid_minutes ] = vectorize(qday_data[valid_minutes],'dF')
+                    D_F[valid_minutes]   = (numpy.ravel(vectorize(magnetic_data[valid_minutes],key)))-\
+                                           (F_median[valid_minutes])
+                   
+                   
+                    ### N  processs
+                    key = 'N'
+              
+                    N_median[valid_minutes] = vectorize(qday_data[valid_minutes],key) - numpy.median(vectorize(qday_data[valid_minutes],key)) + numpy.median(magnetic_data['valid_minutes'],key)
+                    N_sigma[valid_minutes ] = vectorize(qday_data[valid_minutes],'dN')
+                    D_N[valid_minutes]   = (numpy.ravel(vectorize(magnetic_data[valid_minutes],key)))-\
+                                           (N_median[valid_minutes])
+         
+
+                sigma_criteria = 4 
+                number_of_minutes = 5 
+
+                H_max_jump = 800
+
+                mask = vectorize(magnetic_data,'H') < 999990.00
+                mask = mask.astype(bool)
+                elements_of_no_gaps = numpy.count_nonzero(mask)
+                
+                no_gaps = numpy.where(mask)[0]
+
+                nonmask = ~mask
+                number_of_gaps = numpy.count_nonzero(nonmask)
+                tmp = len(numpy.where(nonmask)[0])
+
+
+                H_median_value = 0
+                H_sigma_value = 0
+
+
+                boolean_flag = numpy.empty(elements_of_no_gaps,dtype=int)
+
+                boolean_flag.fill(1)
+
+                mask = F_sigma < 999990.00
+                mask = mask.astype(bool)
+
+                datos_validos = numpy.where(mask)[0]
+                datos_validos_count = numpy.count_nonzero(mask)
+                
+
+                if datos_validos_count > 1 :
+                    mean_F_sigma = numpy.mean(F_sigma[datos_validos]) 
+                else:
+                    mean_F_sigma = 0
 
 
 
+                if number_of_gaps != minutes_per_day:
+                    for i in range(elements_of_no_gaps):
+                        
+                        if i < number_of_minutes and i+number_of_minutes <= elements_of_no_gaps -1:
+                            if i !=0:
 
+                                H_median_value = numpy.median(numpy.concatenate((D_H[no_gaps[:i]],D_H[no_gaps[i+1:i+1+number_of_minutes]])))
+                                H_sigma_value = numpy.std(numpy.concatenate((D_H[no_gaps[:i]],D_H[no_gaps[i+1:i+1+number_of_minutes]])))
+                            else:
+                                H_median_value = numpy.median(D_H[no_gaps[i+1:i+1+number_of_minutes]])
+                                H_sigma_value  = numpy.std(D_H[no_gaps[i+1:i+1+number_of_minutes]])
+
+                        
+                        if i < number_of_minutes and i+number_of_minutes > elements_of_no_gaps-1:
+                            if i !=0 and i != elements_of_no_gaps - 1:
+
+                                H_median_value = numpy.median(numpy.concatenate((D_H[no_gaps[:i]],D_H[no_gaps[i+1:elements_of_no_gaps]])))
+                                H_sigma_value  = numpy.std(numpy.concatenate((D_H[no_gaps[:i]],D_H[no_gaps[i+1:elements_of_no_gaps]])))
+
+                            if i == 0 and i != elements_of_no_gaps -1 :
+
+                                H_median_value = numpy.median(D_H[no_gaps[i+1:elements_of_no_gaps]])
+                                H_sigma_value  = numpy.std(D_H[no_gaps[i+1:elements_of_no_gaps]])
+
+                            if i != 0 and i == elements_of_no_gaps - 1 :
+                                H_median_value = numpy.median(D_H[no_gaps[:elements_of_no_gaps-1]])
+                                H_sigma_value  = numpy.std(D_H[no_gaps[:elements_of_no_gaps-1]])
+
+                        
+                        if i >= number_of_minutes and i + number_of_minutes <= elements_of_no_gaps - 1:
+                            H_median_value = numpy.median(numpy.concatenate((D_H[no_gaps[i-number_of_minutes:i]],D_H[no_gaps[i+1:i+number_of_minutes+1]])))
+                            H_sigma_value  = numpy.std(numpy.concatenate((D_H[no_gaps[i-number_of_minutes:i]],D_H[no_gaps[i+1:i+number_of_minutes+1]])))
+                        
+
+                        if i >= number_of_minutes and i+number_of_minutes > elements_of_no_gaps - 1 :
+                            if i == elements_of_no_gaps-1:
+                                H_median_value = numpy.median(D_H[no_gaps[i-number_of_minutes:elements_of_no_gaps-1]])
+                                H_sigma_value  = numpy.std(D_H[no_gaps[i-number_of_minutes:elements_of_no_gaps-1]])
+
+                            else:
+                                H_median_value  = numpy.median(numpy.concatenate((D_H[no_gaps[i-number_of_minutes:i]],D_H[no_gaps[i+1:elements_of_no_gaps]])))
+                                H_sigma_value  = numpy.std(numpy.concatenate((D_H[no_gaps[i-number_of_minutes:i]],D_H[no_gaps[i+1:elements_of_no_gaps]])))
+
+
+                        ##
+                        # 
+                        if ((numpy.abs(D_H[no_gaps[i]]-H_median_value)) > sigma_criteria*H_sigma_value)       or \
+                            (numpy.abs(D_H[no_gaps[i]])>H_max_jump):
+                            boolean_flag[i] =0
+                        
+
+
+
+                        H_median_value = 0 
+                        H_sigma_value  = 0
+
+                
+                if elements_of_no_gaps > 1 :
+                    D_D [no_gaps] = (boolean_flag == 1) *D_D[no_gaps] + (boolean_flag!= 1)*9999
+                    D_H [no_gaps] = (boolean_flag == 1) *D_H[no_gaps] + (boolean_flag!= 1)*999999.00
+                    D_Z [no_gaps] = (boolean_flag == 1) *D_Z[no_gaps] + (boolean_flag!= 1)*999999.00
+                    D_F [no_gaps] = (boolean_flag == 1) *D_F[no_gaps] + (boolean_flag!= 1)*999999.00
+                    D_N [no_gaps] = (boolean_flag == 1) *D_N[no_gaps] + (boolean_flag!= 1)*999999.00
+
+
+            mask  = D_D < 9990
+            mask2 = D_N < 999990
+
+            mask = mask.astype(bool)
+            mask2 = mask2.astype(bool)
+
+            test_index = numpy.where(mask and mask2)[0]
+            test_count = numpy.count_nonzero(mask and mask2)
+
+            if test_count > 0:
+
+                dd_median = numpy.median(D_D[test_index])
+ 
+                bad_index = numpy.where((D_D > 9990).astype(bool) and (D_N) > 999990 or (D_sigma>9990).astype(bool) )[0]
+                bad_count = len(bad_index)
+
+            else:
+                bad_index = numpy.where(D_D > 9990 or D_N > 999990 or D_sigma > 9990)[0]
+                bad_count = len(bad_index)
+            
+            if bad_count > 0 : 
+
+                D_sigma[bad_index] = 9999
+                D_D [bad_index] = 9999
+                N_sigma[bad_index] = 999999
+                D_N [bad_index] = 999999
+
+            
+            data_file = numpy.empty(minutes_per_day,dtype='object')
+
+            for i in range(minutes_per_day):
+                
+                ##-------------generate chain------------------##
+                subchain = ' {:9.2f}'
+                subchain1 = "  "+subchain*3
+                subchain2 = "  "+subchain*3
+                chain = '{:4d} {:02d}:{:02d}'+subchain1+3*subchain2
+                ################################################3
+
+                data_file [i] = chain.format(i+1,i//60,i % 60 ,
+                                            (magnetic_data[i]['D']),magnetic_data[i]['H'],magnetic_data[i]['Z'],magnetic_data[i]['F'], 
+                                       D_median[i],H_median[i],Z_median[i],F_median[i], N_median[i], 
+                                       D_sigma[i],H_sigma[i],Z_sigma[i],F_sigma[i], N_sigma[i], 
+                                       D_D[i], D_H[i], D_Z[i], D_F[i], D_N[i])
+                
+
+            
+            data_per_day = 24/3
+            minutes_in_3hours = 60*3
+
+            differences_file = numpy.empty(data_per_day,dtype='object')
+
+            max_D = numpy.empty(data_per_day,dtype=float)
+            max_D.fill(9999)
+
+            max_H = numpy.empty(data_per_day,dtype=float)
+            max_H.fill(999999)
+
+            max_Z = deepcopy(max_H)
+            max_F = deepcopy(max_H)
+            max_N = deepcopy(max_H)
+
+            min_D = numpy.empty(data_per_day,dtype=float)
+            min_D.fill(9999)
+
+            min_H = numpy.empty(data_per_day,dtype=float)
+            min_H.fill(999999)
+
+            min_Z = deepcopy(min_H)
+            min_F = deepcopy(min_F)
+            min_N = deepcopy(min_N)
+            
+            delta_D = numpy.empty(data_per_day,dtype=float)
+            delta_D.fill(9999)
+
+            delta_H = numpy.empty(data_per_day,dtype=float)
+            delta_H.fill(999999)
+
+            delta_Z = deepcopy(delta_H)
+            delta_F = deepcopy(delta_H)
+            delta_N = deepcopy(delta_N)
+
+            sigma_D = numpy.empty(data_per_day)
+            sigma_D.fill(9999)
+            
+            sigma_H = deepcopy(delta_H)
+
+            sigma_Z = deepcopy(max_H)
+            sigma_F = deepcopy(max_H)
+            sigma_N = deepcopy(max_H)
+
+            for i in range(data_per_day):
+
+                #------------------------------ Process D ------------------------------#
+                values1 = vectorize(magnetic_data[i*minutes_in_3hours:(i+1)*minutes_in_3hours],'D')
+                values2 = (D_D[i*minutes_in_3hours:(i+1)*minutes_in_3hours])
+
+                mask1 = (values1 < 9990).astype(bool)
+                mask2 = (values2 < 9990).astype(bool)
+
+                mask = mask1 & mask2 
+                                
+                valid_data = numpy.array(numpy.where(mask)[0]) + i*minutes_in_3hours
+
+                valid_count = numpy.count_nonzero(mask)
+
+                if valid_count > 0 :
+
+                    tmp = D_D [valid_data]
+
+                    valid_data_tmp = numpy.where(D_D[valid_data] < 9990)[0]
+                    tmp_count = len(valid_data_tmp)
+
+                    max_D[i] = numpy.nanmax(tmp[valid_data_tmp])
+                    min_D[i] = numpy.nanmax(tmp[valid_data_tmp])
+                    delta_D[i] = numpy.abs(max_D[i]-min_D[i]) if (max_D[i] < 9990 and min_D[i] < 9999) else 9999
+                    sigma_D[i] = numpy.std(tmp[valid_data_tmp]) if (delta_D < 9999 and tmp_count >2) else 9999
+               
+               
+                #------------------------------ Process H------------------------------#
+                values1 = vectorize(magnetic_data[i*minutes_in_3hours:(i+1)*minutes_in_3hours],'H')
+                values2 = (D_H[i*minutes_in_3hours:(i+1)*minutes_in_3hours])
+
+                mask1 = (values1 < 9990).astype(bool)
+                mask2 = (values2 < 9990).astype(bool)
+
+                mask = mask1 & mask2 
+                                
+                valid_data = numpy.array(numpy.where(mask)[0]) + i*minutes_in_3hours
+
+                valid_count = numpy.count_nonzero(mask)
+
+                if valid_count > 0 :
+
+                    tmp = D_H [valid_data] 
+
+                    valid_data_tmp = numpy.where(D_H[valid_data] < 9990)[0]
+                    tmp_count = len(valid_data_tmp)
+
+                    max_H[i] = numpy.nanmax(tmp[valid_data_tmp])
+                    min_H[i] = numpy.nanmax(tmp[valid_data_tmp])
+                    delta_H[i] = numpy.abs(max_H[i]-min_H[i]) if (max_H[i] < 9990 and min_H[i] < 9999) else 9999
+                    sigma_H[i] = numpy.std(tmp[valid_data_tmp]) if (delta_H < 9999 and tmp_count >2) else 9999
+                
+                #------------------------------ Process Z ------------------------------#
+                values1 = vectorize(magnetic_data[i*minutes_in_3hours:(i+1)*minutes_in_3hours],'Z')
+                values2 = (D_Z[i*minutes_in_3hours:(i+1)*minutes_in_3hours])
+
+                mask1 = (values1 < 9990).astype(bool)
+                mask2 = (values2 < 9990).astype(bool)
+
+                mask = mask1 & mask2 
+                                
+                valid_data = numpy.array(numpy.where(mask)[0]) + i*minutes_in_3hours
+
+                valid_count = numpy.count_nonzero(mask)
+
+                if valid_count > 0 :
+
+                    tmp = D_Z [valid_data] 
+
+                    valid_data_tmp = numpy.where(D_Z[valid_data] < 9990)[0]
+                    tmp_count = len(valid_data_tmp)
+
+                    max_Z[i] = numpy.nanmax(tmp[valid_data_tmp])
+                    min_Z[i] = numpy.nanmax(tmp[valid_data_tmp])
+                    delta_Z[i] = numpy.abs(max_Z[i]-min_Z[i]) if (max_Z[i] < 9990 and min_Z[i] < 9999) else 9999
+                    sigma_Z[i] = numpy.std(tmp[valid_data_tmp]) if (delta_Z < 9999 and tmp_count >2) else 9999
+                
+                #------------------------------ Process F ------------------------------#
+                values1 = vectorize(magnetic_data[i*minutes_in_3hours:(i+1)*minutes_in_3hours],'F')
+                values2 = (D_F[i*minutes_in_3hours:(i+1)*minutes_in_3hours])
+
+                mask1 = (values1 < 9990).astype(bool)
+                mask2 = (values2 < 9990).astype(bool)
+
+                mask = mask1 & mask2 
+                                
+                valid_data = numpy.array(numpy.where(mask)[0]) + i*minutes_in_3hours
+
+                valid_count = numpy.count_nonzero(mask)
+
+                if valid_count > 0 :
+
+                    tmp = D_F [valid_data] 
+
+                    valid_data_tmp = numpy.where(D_F[valid_data] < 9990)[0]
+                    tmp_count = len(valid_data_tmp)
+
+                    max_F[i] = numpy.nanmax(tmp[valid_data_tmp])
+                    min_F[i] = numpy.nanmax(tmp[valid_data_tmp])
+                    delta_F[i] = numpy.abs(max_F[i]-min_F[i]) if (max_F[i] < 9990 and min_F[i] < 9999) else 9999
+                    sigma_F[i] = numpy.std(tmp[valid_data_tmp]) if (delta_F < 9999 and tmp_count >2) else 9999
+
+                #------------------------------ Process N ------------------------------#
+                values1 = vectorize(magnetic_data[i*minutes_in_3hours:(i+1)*minutes_in_3hours],'N')
+                values2 = (D_N[i*minutes_in_3hours:(i+1)*minutes_in_3hours])
+
+                mask1 = (values1 < 9990).astype(bool)
+                mask2 = (values2 < 9990).astype(bool)
+
+                mask = mask1 & mask2 
+                                
+                valid_data = numpy.array(numpy.where(mask)[0]) + i*minutes_in_3hours
+
+                valid_count = numpy.count_nonzero(mask)
+
+                if valid_count > 0 :
+
+                    tmp = D_N [valid_data] 
+
+                    valid_data_tmp = numpy.where(D_N[valid_data] < 9990)[0]
+                    tmp_count = len(valid_data_tmp)
+
+                    max_N[i] = numpy.nanmax(tmp[valid_data_tmp])
+                    min_N[i] = numpy.nanmax(tmp[valid_data_tmp])
+                    delta_N[i] = numpy.abs(max_N[i]-min_N[i]) if (max_N[i] < 9990 and min_N[i] < 9999) else 9999
+                    sigma_N[i] = numpy.std(tmp[valid_data_tmp]) if (delta_N < 9999 and tmp_count >2) else 9999               
+ 
+                #---------------------------------------------------------------------------------------------
+                #---------------------------------------------------------------------------------------------
+                #---------------------------------------------------------------------------------------------
+                #
+                subchain1 = 4*" {:7.2f}"
+                subchain2 = 4*" {:9.2f}"
+                subchain = subchain1 + subchain2*4
+                chain = '{:02d}  '+subchain
+
+
+                differences_file[i] = chain.format(i*24//data_per_day,  
+                                       max_D[i], min_D[i], sigma_D[i], delta_D[i], 
+                                       max_H[i], min_H[i], sigma_H[i], delta_H[i], 
+                                       max_Z[i], min_Z[i], sigma_Z[i], delta_Z[i], 
+                                       max_F[i], min_F[i], sigma_F[i], delta_F[i], 
+                                       max_N[i], min_N[i], sigma_N[i], delta_N[i], )
+
+            extention = '.early' if real_time else '.final'
+
+            output_file = '{}_{:4d}{:02d}{:02d}'.format(self.GMS[self.system['gms']]['code'],initial_year,initial_month,initial_day)
+            output_path = os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'])
+            
+
+            exist_dir = os.path.isdir(output_path)
+            
+            if not exist_dir:
+                if verbose:
+                    print("El directorio {} no existe, se creará el directorio.".format(output_path))
+                
+                os.makedirs(exist_dir)
+
+
+            with open (os.path.join(output_path,output_file+'.data'+extention),'w') as file:
+                file.readlines(line+'\n' for line in data_file)
+            
+            if verbose:
+                print("Archivo guardado {}".format(output_file+'.data'+extention))
+
+
+            with open (os.path.join(output_path,output_file+'.differences'+extention),'w') as file:
+                file.readlines(line+'\n' for line in differences_file)            
+            if verbose:
+                print("Archivo guardado {}".format(output_file+'.differences'+extention))       
 
 
 
             
-        except:
-            RuntimeWarning("Ocurruió un error en makig_processddatafiles.")
-            return 
 
+
+ 
+                
+ 
+
+
+
+
+
+
+
+
+
+          
+ 
+
+
+
+
+
+
+
+
+
+ 
 
  
 
@@ -4100,11 +4681,17 @@ class geomagixs (object):
         except:
             print("Ocurrio un error")
         
-    def __make_planetarymagneticdatafiles(self,date=None, station=None,verbose=False,force_all=False):
+    def __make_planetarymagneticdatafiles(self,**kwargs):
         #script -> geomagixs_magneticdata_download.pro
         #falta
-        try:
-            
+ 
+            date = kwargs.get("date",None)
+            station = kwargs.get("station", None)
+            verbose = kwargs.get("verbose",False)
+            force_all = kwargs.get("force_all",False)
+
+
+
             if self.GMS[self.system['gms']]['name'] != "planetary":
                 return 
             
@@ -4152,9 +4739,15 @@ class geomagixs (object):
                 if value.lower()[:6]==line.lower[:6]:
                     if n>0:
                         if len(value)>=62:
-                            #falta encontrar linea de caracteres
-                            # linea 348
-                            pass
+                            read_format = r"\b\d+(?:\.\d+)?\b"
+                            temp = re.findall(read_format,value)
+                            if len(temp)>0:
+
+                                
+
+                                #falta encontrar linea de caracteres
+                                # linea 348
+                                pass
                         else:
                             tmp_kp = numpy.empty(8)
                             #falta rutina
@@ -4288,12 +4881,7 @@ class geomagixs (object):
 
             
 
-
-        
-        except:
-            print("Ocurrio un error en {}".format("__make_planetarymagneticdatafiles"))
-    
-    
+ 
      
     
     
@@ -4694,6 +5282,7 @@ class geomagixs (object):
         update_file = kwargs.get("update_file",False)
         verbose = kwargs.get("verbose",False)
         force_all = kwargs.get("force_all",False)
+        station = kwargs.get("station",None)
 
         ###############################################################
 
@@ -4759,7 +5348,9 @@ class geomagixs (object):
                 
                     
             if (self.GMS[self.system['gms']]['name']!="planetary"):
-                
+                #############################################################################3
+                #############################################################################3
+                #############################################################################3
                 fpath = os.path.join(self.system['indexes_dir'] ,self.GMS[self.system['gms']]['name'])
                 fname = self.GMS[self.system['gms']]['code']+'_????????.k_index.early'
                 
@@ -4780,43 +5371,417 @@ class geomagixs (object):
 
                 if total_files > 0 :
 
-                    expected_number = JULDAY(datetime(tmp[4],tmp[5],tmp[6])) -JULDAY(datetime(tmp[0],tmp[1],tmp[2]))+1
-                    buff = []
-                    for file in [file0[0],file0[-1]]:
+                    
+                    for n,file in enumerate([file0[0],file0[-1]]):
                         with open(file,'r') as file:
-                            re.findall(r'\d+\.?\d*', linea)
-                            # Convertir los valores a enteros o números de punto flotante según corresponda
-                            valores = [int(v) if v.isdigit() else float(v) for v in valores]
+                            for linea in file.readlines():
+                                re.findall(r'\d+\.?\d*', linea)
+                                # Convertir los valores a enteros o números de punto flotante según corresponda
+                                valores = [int(v) if v.isdigit() else float(v) for v in valores]
 
+                                valor = valores[-1]
 
+                                index_dates[n*3]=int(valor[:4])
+                                index_dates[n*3+1]=int(valor[4:6])
+                                index_dates[n*3+2]=int(valor[6:8])
 
-            
+                    date1 = datetime(index_dates[3],index_dates[4],index_dates[5])
+                    date2 = datetime(index_dates[0],index_dates[1],index_dates[2])
 
-                tmp_str1 = str_length1 <10 
+                    expected_number = JULDAY(date1) - JULDAY(date2) + 1
+
                 
+                if total_files<0 or expected_number>total_files:
+
+                    if verbose:
+                        Warning("Es requerido actualizar 'early data' manualmente los index files para el GMS: {}".format(self.GMS[self.system['gms']]['name']))
+
+                #############################################################################3
+                #############################################################################3
+                #############################################################################3
                 
-                directory = os.path.join(os.path.expanduser("~"), "output", "data")
+                fpath = os.path.join(self.system['indexes_dir'] ,self.GMS[self.system['gms']]['name'])
+                fname = self.GMS[self.system['gms']]['code']+'_????????.k_index.final'
                 
-                directory = os.path.join(os.path.expanduser("~"),self.system['indexes_dir'],\
-                                        self.GMS[self.system['gms']]['name'])
-                #en este caso, el codigo idl nos proporciona un directorio
-                file_list = os.listdir(directory)
-                str_len1 = 
+                fpath = os.path.join(fpath,fname) 
+                #buscamos archivos con el mismo patron
+                file0 = searchforpatron(fpath)
+                total_files = len(file0)
+
+                str_length1 = len(os.path.expanduser(os.path.join(self.system['indexes_dir'],
+                                                                  self.GMS[self.system['gms']]['name']))) + \
+                              len('/'+self.GMS[self.system['gms']]['code']+'_')
                 
-                ## no sé que es esta parte 
-                # falta linea  150 -> 
+                str_length2 = len('.k_index.final') + len(os.path.expanduser(os.path.join(self.system['indexes_dir'],self.GMS[self.system['gms']]['name'])))+len("/"+self.GMS[self.system['gms']]['code']+'_')
                 
-            
-                            
+                if total_files > 0 :
+
                     
+                    for n,file in enumerate([file0[0],file0[-1]]):
+                        with open(file,'r') as f:
+                            for linea in f.readlines():
+                                re.findall(r'\d+\.?\d*', linea)
+                                # Convertir los valores a enteros o números de punto flotante según corresponda
+                                valores = [int(v) if v.isdigit() else float(v) for v in valores]
+
+                                valor = valores[-1]
+
+                                index_dates_0[n*3]=int(valor[:4])
+                                index_dates_0[n*3+1]=int(valor[4:6])
+                                index_dates_0[n*3+2]=int(valor[6:8])
+
+                    date1 = datetime(index_dates_0[3],index_dates_0[4],index_dates_0[5])
+                    date2 = datetime(index_dates_0[0],index_dates_0[1],index_dates_0[2])
+
+                    expected_number = JULDAY(date1) - JULDAY(date2) + 1
+
+                if total_files<0 or expected_number>total_files:
+
+                    if verbose:
+                        Warning("Es requerido actualizar 'early data' manualmente los index files para el GMS: {}".format(self.GMS[self.system['gms']]['name']))
+
+                ##########################################################################
+                fpath = os.path.join(self.system['datasource_dir'] ,self.GMS[self.system['gms']]['name'])
+                fname = self.GMS[self.system['gms']]['code']+'_????????rmin.min'
+                
+                fpath = os.path.join(fpath,fname) 
+                #buscamos archivos con el mismo patron
+                file1 = searchforpatron(fpath)
+                total_files = len(file1)
+
+                str_length1 = len(os.path.expanduser(os.path.join(self.system['datasource_dir'],
+                                                                  self.GMS[self.system['gms']]['name']))) + \
+                                len('/'+self.GMS[self.system['gms']]['code'])
+                
+                str_length2 = len('rmin.min') + \
+                              len(os.path.expanduser(os.path.join(self.system['datasource_dir'],
+                                                                  self.GMS[self.system['gms']]['name'])))+ \
+                              len("/"+self.GMS[self.system['gms']]['code'])
+                
+                if total_files > 0 :
+
                     
+                    for n,file in enumerate([file1[0],file1[-1]]):
+                        with open(file,'r') as f:
+                            for linea in f.readlines():
+                                re.findall(r'\d+\.?\d*', linea)
+                                # Convertir los valores a enteros o números de punto flotante según corresponda
+                                valores = [int(v) if v.isdigit() else float(v) for v in valores]
+
+                                valor = valores[-1]
+
+                                index_dates_0[n*3]=int(valor[:4])
+                                index_dates_0[n*3+1]=int(valor[4:6])
+                                index_dates_0[n*3+2]=int(valor[6:8])
+
+                    date1 = datetime(index_dates_0[3],index_dates[4],index_dates_0[5])
+                    date2 = datetime(index_dates_0[0],index_dates_0[1],index_dates_0[2])
+
+                    expected_number = JULDAY(date1) - JULDAY(date2) + 1
+
+                if total_files<0 or expected_number>total_files:
+
+                    if verbose:
+                        Warning("Es requerido actualizar 'early data' manualmente los index files para el GMS: {}".format(self.GMS[self.system['gms']]['name']))
+
+
+                ########################index_dates###########################################################
+                fpath = os.path.join(self.system['datasource_dir'] ,self.GMS[self.system['gms']]['name'])
+                fname = self.GMS[self.system['gms']]['code']+'_????????rK.min'
                 
-    
+                fpath = os.path.join(fpath,fname) 
+                #buscamos archivos con el mismo patron
+                file2 = searchforpatron(fpath)
+                total_files = len(file2)
+
+                str_length1 = len(os.path.expanduser(os.path.join(self.system['datasource_dir'],
+                                                                  self.GMS[self.system['gms']]['name']))) + \
+                                len('/'+self.GMS[self.system['gms']]['code']+'_')
                 
+                str_length2 = len('rK.min') + \
+                              len(os.path.expanduser(os.path.join(self.system['datasource_dir'],
+                                                                  self.GMS[self.system['gms']]['name'])))+ \
+                              len("/"+self.GMS[self.system['gms']]['code'])
+                
+                if total_files > 0 :
+
+                    
+                    for n,file in enumerate([file2[0],file2[-1]]):
+                        with open(file,'r') as f:
+                            for linea in f.readlines():
+                                re.findall(r'\d+\.?\d*', linea)
+                                # Convertir los valores a enteros o números de punto flotante según corresponda
+                                valores = [int(v) if v.isdigit() else float(v) for v in valores]
+
+                                valor = valores[-1]
+
+                                magnetic_dates2[n*3]=int(valor[:4])
+                                magnetic_dates2[n*3+1]=int(valor[4:6])
+                                magnetic_dates2[n*3+2]=int(valor[6:8])
+
+                    date1 = datetime(magnetic_dates2[3],magnetic_dates2[4],magnetic_dates2[5])
+                    date2 = datetime(magnetic_dates2[0],magnetic_dates2[1],magnetic_dates2[2])
+
+                    expected_number = JULDAY(date1) - JULDAY(date2) + 1
+
+                if total_files<0 or expected_number>total_files:
+
+                    if verbose:
+                        Warning("Es requerido actualizar 'early data' manualmente los index files para el GMS: {}".format(self.GMS[self.system['gms']]['name']))
+
+            else:
+
+                #####################################################################################
+
+                fpath = os.path.join(self.system['datasource_dir'] ,self.GMS[self.system['gms']]['name'])
+                fname = self.GMS[self.system['gms']]['code']+'_????????rK.min'
+                
+                fpath = os.path.join(fpath,fname) 
+                #buscamos archivos con el mismo patron
+                file = searchforpatron(fpath)
+                total_files = len(file)
+
+                if total_files > 0 :
+                    
+                    tmp_pos = inverse_search(file[0],self.GMS[self.system['gms']]['code']+'_') + len(self.GMS[self.system['gms']]['code']+'_')
+                    tmp_str1 = '{:0d }'.format(tmp_pos)
+
+                    tmp_pos = inverse_search(file[-1],self.GMS[self.system['gms']]['code']+'_') + len(self.GMS[self.system['gms']]['code']+'_')+len('.k_index')
+                    tmp_str2 = '{:0d} '.format(tmp_pos)
+ 
+                    for n,line in enumerate([file[0],file[-1]]):
+                        chain = line.split(" ")
+                        valor = chain[-1]
+
+                        index_dates[n*3] = int(valor[:4])
+                        index_dates[n*3+1] = int(valor[4:6])
+                        index_dates[n*3+2] = int(valor[6:8])
+                    
+                    date1 = datetime(index_dates[0],index_dates[1],index_dates[2])
+                    date2 = datetime(index_dates[3],index_dates[4],index_dates[5])
+                    expected_number = JULDAY(date2)-JULDAY(date1)+1
+                
+
+                index_dates_0 = index_dates
+
+                if total_files <=0 or expected_number>total_files:
+                    if verbose:
+                        print("Archivos incompletos para seleccionado GMS {}. Es requerido actualizar manualmente los archivos.".format(self.GMS[self.system['gms']]['name']))
+
+                
+                #####################################################################################
+                #####################################################################################
+
+                fpath = os.path.join(self.system['datasource_dir'] ,self.GMS[self.system['gms']]['name'])
+                fname = os.path.join(self.GMS[self.system['gms']]['code'],'kp????.wdc')
+                
+                fpath = os.path.join(fpath,fname) 
+                #buscamos archivos con el mismo patron
+                file1 = searchforpatron(fpath)
+                total_files1 = len(file1)
+
+                if total_files > 0 :
+                    tmp_mag_dates = numpy.zeros(4)
+
+                    tmp_pos = inverse_search(file1[0],'kp') + len('kp')
+                    tmp_str1 = '{:0d }'.format(tmp_pos)
+
+                    tmp_pos = inverse_search(file1[-1],'kp') + len('kp.wdc')
+                    tmp_str2 = '{:0d} '.format(tmp_pos)
+ 
+                    for n,line in enumerate([file[0],file[-1]]):
+                        chain = line.split(" ")
+                        valor = chain[-1]
+
+                        tmp_mag_dates[n*2]   = int(valor[:2])
+                        tmp_mag_dates[n*2+1] = int(valor[2:4])
+
+                    expected_number1 = (tmp_mag_dates[2]-tmp_mag_dates[0])*12 + tmp_mag_dates[3]-tmp_mag_dates[1]+1
+
+                    magnetic_dates1[4] = tmp_mag_dates[3]
+                    magnetic_dates1[3] = tmp_mag_dates[2]+2000
+                    magnetic_dates1[1] = tmp_mag_dates[1]
+                    magnetic_dates1[0] = tmp_mag_dates[0]+2000                    
+                    
+                    date1 = datetime(magnetic_dates1[0],magnetic_dates1[1]+1,1)+relativedelta(days=-1)
+                    date2 = datetime(magnetic_dates1[0],magnetic_dates1[1],1)+relativedelta(days=-1)
+
+                    magnetic_dates1[2] = JULDAY(date1)-JULDAY(date2)
+
+
+                    date1 = datetime(magnetic_dates1[3],magnetic_dates1[4]+1,1)+relativedelta(days=-1)
+                    date2 = datetime(magnetic_dates1[3],magnetic_dates1[4],1)+relativedelta(days=-1)
+
+                    magnetic_dates1[5] = JULDAY(date1)-JULDAY(date2)
+ 
+                #####################################################################################
+
+                fpath = os.path.join(self.system['datasource_dir'] ,self.GMS[self.system['gms']]['name'])
+                fname = os.path.join('dst????.dat')
+                
+                fpath = os.path.join(fpath,fname) 
+                #buscamos archivos con el mismo patron
+                file2 = searchforpatron(fpath)
+                total_files2 = len(file1)            
+                
+
+                if total_files2 >0:
+                    tmp_mag_dates = numpy.zeros(4)
+
+                    tmp_pos = inverse_search(file2[0],'dst') + len('dst')
+                    tmp_str1 = '{:0d} '.format(tmp_pos)
+
+                    tmp_pos = inverse_search(file2[-1],'dst') + len('dst') + len('.dat')
+                    tmp_str2 = "{:0d} ".format(tmp_pos)
+
+                    for n,line in enumerate([file[0],file[-1]]):
+                        
+                        line = line.split(" ")
+                        valor = line[-1]
+
+                        tmp_mag_dates[n*2] = int(valor[:2])
+                        tmp_mag_dates[n*2+1] = int(valor[2:4])
+
+                    
+                    expected_number2 = (tmp_mag_dates[2]-tmp_mag_dates[0])*12 + \
+                                      tmp_mag_dates[3] - tmp_mag_dates[1]+1
+                    
+                    magnetic_dates2[4] = tmp_mag_dates[3]
+                    magnetic_dates2[3] = tmp_mag_dates[2]+2000
+                    magnetic_dates2[1] = tmp_mag_dates[1]
+                    magnetic_dates2[0] = tmp_mag_dates[0]+2000            
+
+                    magnetic_dates2[2] = JULDAY(datetime(magnetic_dates2[0],magnetic_dates2[1],1)+\
+                                                relativedelta(months=+1)+relativedelta(days=-1)) - JULDAY(datetime(magnetic_dates2[0],magnetic_dates2[1],1)+relativedelta(days=-1))      
+                        
+
+
+
+                if expected_number1 >total_files1 or total_files2<=0 or (expected_number2>total_files2):
+                    if verbose:
+                        print("Inconsistencia: Archivos incompletos de datos magneticos para seleccionado GMS {}. \
+                              El sistema tomara como vacio los archivos perdidos.".format(self.GMS[self.system['gms']]['name']))
+                        
+
+                
+
+                index_dates_0 = index_dates
+
+                if total_files <=0 or expected_number>total_files:
+                    if verbose:
+                        print("Archivos incompletos para seleccionado GMS {}. Es requerido actualizar manualmente los archivos.".format(self.GMS[self.system['gms']]['name']))
+
+                
+                #####################################################################################
+
+            if numpy.prod(magnetic_dates1)>0:
+                magnetic_dates[3:6] = magnetic_dates2[3:6] if (JULDAY(datetime(magnetic_dates2[3],magnetic_dates2[4],magnetic_dates2[5]))> JULDAY(datetime(magnetic_dates2[3],magnetic_dates2[4],magnetic_dates2[5]))) else magnetic_dates1[3:5]
+                magnetic_dates[0:3] = magnetic_dates2[:3] if (JULDAY(datetime(magnetic_dates2[0],magnetic_dates2[1],magnetic_dates2[2]))> JULDAY(datetime(magnetic_dates2[0],magnetic_dates2[1],magnetic_dates2[2]))) else magnetic_dates1[:3]
+
+            else:
+                magnetic_dates[-3:] = magnetic_dates2[-3:]
+                magnetic_dates[:3]  = magnetic_dates2[:3]
+
+            format_ = '{:4d}{:02d}{:02d}-{:4d}{:02d}{:02}'
+            file  =  os.path.join(self.system['auxiliar_dir'],self.GMS[self.system['gms']]['name']+'.dates')
+
+            string_data = numpy.empty(5,dtype='object')
+
+            string_data[0] = '# File with available date range for the GMS: 1st and 2nd rows are related with the early and final k-index files, respectively; and the 3rd row with the magnetic data files.'
+            string_data[1] = '# the format is initial-final date [YYYYMMDD]'
+            string_data[2] = format_.format(index_dates[0],index_dates[1],index_dates[2],
+                                            index_dates[3],index_dates[4],index_dates[5])
+            string_data[3] = format_.format(index_dates_0[0],index_dates_0[1],index_dates_0[2],
+                                            index_dates_0[3],index_dates_0[4],index_dates_0[5])
+
+
+            with open(file,'w') as f:
+                
+                f.writelines(line+'\n' for line in string_data)
+                if verbose:
+                    print("Actualizado {}.dates".format(self.GMS[self.system['gms']]))
+        
+        format_ = '{:4d}{:02d}{:02d}-{:4d}{:02d}{:02}'
+        st1 = format_.format(index_dates[0],index_dates[1],index_dates[2],
+                                            index_dates[3],index_dates[4],index_dates[5])
+        st2 = format_.format(index_dates_0[0],index_dates_0[1],index_dates_0[2],
+                                            index_dates_0[3],index_dates_0[4],index_dates_0[5])
+        
+        st3 = format_.format(magnetic_dates[0],magnetic_dates[1],magnetic_dates[2],
+                                            magnetic_dates[3],magnetic_dates[4],magnetic_dates[5])
+        
+
+        if verbose:
+            print("   Index[early] files date-range: {}".format(st1))
+            print("   Index [final] files date-range: {}".format(st2))
+            print("   Magnetic data data-range".format(st3))
+
+
+        self.GMS[self.system['gms']]['dates_index'][0,:] = index_dates[:3]
+        self.GMS[self.system['gms']]['dates_index'][1,:] = index_dates[3:6]
+        self.GMS[self.system['gms']]['dates_index'][2,:] = index_dates_0[:3]
+        self.GMS[self.system['gms']]['dates_index'][3,:] = index_dates_0[3:6]
+        self.GMS[self.system['gms']]['dates_data'][0,:] = magnetic_dates[3:6]
+        self.GMS[self.system['gms']]['dates_data'][1,:] = magnetic_dates[3:6]
+        
+
+        #####################################################################
+        #### Quiet Days Section
+        #####################################################################
+
+        if update_file is False:
+
+            fpath = os.path.join(self.system['auxiliar_dir'],'qdays.dates')
+
+            if not os.access(fpath,os.R_OK) :
+                if verbose:
+                    print("Error critico, incapaz de leer archivos Q-days.")
+
+                return
+            else:
+                file_qd  = os.path.join(self.system['auxiliar_dir'],'qdays.dates')
+
+                exists = os.path.isfile(file_qd)
+
+            if exists:
+                with open(file_qd,'r') as file:
+                    number_of_lines = len(file.readlines())
+                    date_data =  numpy.array(file.readlines(),dtype='object')
+
+                    buff = list()
+                    for line in date_data:
+                        if line[0]!='#':
+                            buff.append(line)
+                    value = buff[0].split(" ")
+                    
+                    index_dates[0],index_dates[1],index_dates[2] = int(value[0][:4]),int(value[0][4:6]),int(value[0][6:8])
+                    index_dates[3],index_dates[4],index_dates[5] = int(value[-1][:4]),int(value[-1][4:6]),int(value[-1][6:8])
+
+                    if verbose:
+                        print(" Data descargada de qdays.dates")
+
+                    
+            
+            if verbose:
+
+                print("Quiet Days date-range: {:4d}{:02d}{:02d}-{:4d}{:02d}{:02d}".format(index_dates[0],index_dates[1],index_dates[2],
+                                                                                          index_dates[3],index_dates[4],index_dates[5]))
+            
+            self.system['qdays_dates'][0,:] = index_dates[:3]
+            self.system['qdyas_dates'][1,:] = index_dates[3:6]
+
+
+        self.Flag_dates = True
+
+        return 
+
+                    
+
+
                 
             
 
-    def __check_gms(self,kwargs**):
+    def __check_gms(self,**kwargs):
         #script -> geomaxis_check_gms.pro
         #está listo
         
@@ -5146,7 +6111,7 @@ class geomagixs (object):
                                                 'longitude'   : 0.,
                                                 'elevation'   : 0.,
                                                 'calibration' : numpy.zeros(28,dtype=numpy.float64),
-                                                'data_index'  :  numpy.zeros((4,3)),
+                                                'dates_index'  :  numpy.zeros((4,3)),
                                                 'dates_data'  : numpy.zeros((2,3)), #[datetime initial, datetime final]
                                                 'base_line'   : numpy.zeros(3),   # [D,H,Z]
                                                 'check_flag'  : 0 
