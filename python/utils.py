@@ -7,6 +7,7 @@ from scipy.signal import convolve
 from datetime import datetime
 import numbers 
 import glob
+from copy import deepcopy
 
 months = ['jan','feb','mar','apr','may','jun','jul','aug','sep',\
                       'sep','oct','nov','dec']
@@ -92,10 +93,13 @@ def check_dates (initial=None, final=None, **kwargs):
         print("Ocurrió un error ")
 
 
-
+def fill(array,struct):
+    for n,_ in enumerate(array):
+        array[n] = deepcopy(struct)
+    return array 
 def vectorize(dict_,key):
     #return a array with all values that belong key from dict 
-    return numpy.array([data[key] for data in dict_ ])
+    return (numpy.array([data[key] for data in dict_ ]))
 
 
 def space(number):
@@ -231,3 +235,63 @@ def check_directory(path_dir,verbose= False,type_='r'):
         return False
 
     return True
+
+
+
+
+
+
+
+
+
+
+
+
+#########################################################################################
+##################### funciones unicas #############################################
+#####################################################################################
+
+
+def inverse_search(chain,subchain):
+
+    chain = str(chain)
+    lon = len(str(subchain))
+    total = len(chain)
+
+    value= chain.rfind(subchain)
+    if value <0:
+        return False
+    else:
+        return total-value-lon
+
+
+
+
+
+def POLY_FIT (x,y,n=2):
+
+    class  obj(object):
+
+        def __init__ (self):
+
+            self.result = None
+            self.tendency = None
+            self.delta = None
+            self.status_result = None
+
+
+
+    result = numpy.polyfit(x,y,n)
+    tendency = numpy.polyval(result,x)
+    delta = numpy.std(tendency-y)
+
+    status_result  =numpy.isnan(result).any()
+
+
+    payload = obj()
+
+    payload.result = result
+    payload.tendency = tendency
+    payload.delta = delta
+    payload.status_result = status_result
+    return payload 
