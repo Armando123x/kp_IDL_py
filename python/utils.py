@@ -33,11 +33,15 @@ def verifyisnumber(var):
         return True
     return False
 
-def check_dates (initial=None, final=None, **kwargs):
+def check_dates (self,initial=None, final=None, **kwargs):
     # script geomagixs_check_dates.pro
     verbose = kwargs.get('verbose',True)
     gms = kwargs.get('GMS',None)
+    if gms is None:
+        gms = self.GMS
     system = kwargs.get('system',None)
+    if system is None:
+        system = self.system
 
     if gms is None:
         raise AttributeError ("El método check_dates necesita el parámetro gms.")

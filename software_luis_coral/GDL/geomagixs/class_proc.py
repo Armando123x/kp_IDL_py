@@ -23,6 +23,7 @@ from datetime import datetime,timedelta
 import urllib.request
 import re
 from glob import glob
+import pytz
 
 from utils import *
 
@@ -70,8 +71,17 @@ class geomagixs (object):
         # Se define la funcion geomagixs.pro
    
  
- 
-
+            ##########################################################
+            ### Presentación
+            #
+            hoy = datetime.now()
+            print("###########################")
+            print("Iniciamos el sistema")
+            print("Tiempo local: {:4d}/{:02d}/{:02d} {:02d}:{:02d}".format(hoy.year,hoy.month,hoy.day,hoy.hour,hoy.minute))
+            hoy = datetime.now(pytz.UTC)
+            print("Tiempo UTC: {:4d}/{:02d}/{:02d} {:02d}:{:02d}".format(hoy.year,hoy.month,hoy.day,hoy.hour,hoy.minute))
+            print("###########################")
+            
 
             verbose= kwargs.get('verbose',False)
             force_all = kwargs.get('force_all',False)
@@ -79,47 +89,49 @@ class geomagixs (object):
 
             initial_date = kwargs.get('initial_date',None)
             final_date = kwargs.get('final_date',None)
+            update_file = kwargs.get("update_file",None)
 
             ##############################################################
             keys=kwargs.keys()
 
  
 
-            working_dir =   kwargs.get('working_dir')
-            gms_stn     =   kwargs.get("gms_stn")
+            working_dir =   kwargs.get('working_dir','')
+            station     =   kwargs.get("station",None)
             real_time   =   0 
 
  
             
             self.__setup__commons()
-            self.__check_system()
+            self.__check_system(**kwargs)
 
             #falta
             #falta asegurar que datos sean string
-            self.__check_gms(station=gms_stn)
+            self.__check_gms(station=station)
+            kwargs['station'] = self.GMS[self.system['gms']]['name']
 
-            self.__setup_dates(station=station, force_all=force_all,update_file= update_file)
+
+            self.__setup_dates(**kwargs)
                                
-            self.__quietdays_download(initial=initial_date,final= final_date,verbose=verbose)
-            station = self.GMS[self.system['gms']]['name']
+            self.__quietdays_download(initial=initial_date,final= final_date,**kwargs)
             
 
             #########################################
             ### Actualizando archivos 
             self.__quietdays_download(initial_date,final_date,**kwargs)
-            self.__magneticdata_download(date_initial=initial_date,date_final=final_date,verbose=verbose,station=station)
-            self.__magneticdata_prepare(initial_date,final_date,station=self.GMS[self.system['gms']]['name'],force_all=force_all)
-            self.__magneticdata_process(initial_date,final_date,station=self.GMS[self.system['gms']]['name'],force_all=force_all,real_time=real_time)
+            self.__magneticdata_download(date_initial=initial_date,date_final=final_date,**kwargs)
+            self.__magneticdata_prepare(initial_date,final_date,**kwargs)
+            self.__magneticdata_process(initial_date,final_date,**kwargs)
 
             #################################################
             # CARGANDO DATOS
 
-            self.__magneticindex_compute(initial_date,final_date,station=self.GMS[self.system['gms']]['name'],force_all=force_all,real_time=real_time)
+            self.__magneticindex_compute(initial_date,final_date,**kwargs)
             
-            self.__magneticindex_monthlyfile(initial_date,final_date,station=self.GMS[self.system['gms']]['name'],force_all=force_all,real_time=real_time)
+            self.__magneticindex_monthlyfile(initial_date,final_date,**kwargs)
 
 
-            self.__setup_dates(station=station, force_all=force_all,update_file= update_file)
+            self.__setup_dates(**kwargs)
             #######
             # No se define los scripts de ploteo
             # geomagixs_magneticindex_plotk, initial_date, final_date, STATION=gms[system.gms].name, /force_all, REAL_TIME=real_time
@@ -609,7 +621,7 @@ class geomagixs (object):
             file.writelines(k_mex_data)
 
 
-        if self.verbose:
+        if verbose:
             print("Guardando {}.".format(os.path.basename(output_path)))
 
         return 
@@ -670,7 +682,7 @@ class geomagixs (object):
             file.writelines(dh_mex_data)
         
 
-        if self.verbose:
+        if verbose:
             print("Guardando {}".format(os.path.basename(fpath)))
         
 
@@ -710,7 +722,7 @@ class geomagixs (object):
         with open(fpath,'w') as file:
             file.writelines(profile_data)
         
-        if self.verbose:
+        if verbose:
             print("Guardando {}.".format(os.path.basename(fpath)))
 
         return 
@@ -829,7 +841,7 @@ class geomagixs (object):
         with open(fpath,'w') as file:
             file.writelines(k_mex_data)
 
-        if self.verbose:
+        if verbose:
             print("Guardando {}".format(os.path.basename(output_datafile)))
 
         
@@ -870,7 +882,7 @@ class geomagixs (object):
         with open(fpath,'w') as file:
             file.writelines(dH_mex_data)
         
-        if self.verbose:
+        if verbose:
             print("Guardando {}".format(os.path.basename(fpath)))
 
 
@@ -916,7 +928,7 @@ class geomagixs (object):
         capable_to_update = len(numpy.where(exists_files == True)[0])
             
         if capable_to_update == 0 :
-            if self.verbose:
+            if verbose:
                 print(" Data File Error: No se encuentran archivos del tipo GMS_YYYYMMDD.differences{}. La data será asumida con gaps.".format(extention))
         
         name_k_index = numpy.empty(file_number,dtype= 'object')
@@ -934,7 +946,7 @@ class geomagixs (object):
         else:
             files_to_update = 0 
         
-        if self.verbose:
+        if verbose:
             if files_to_update>0:
                 print("Un total de archivos necesitan ser actualizados".format(files_to_update))
             else:
@@ -958,7 +970,7 @@ class geomagixs (object):
             else:
                 self.__getting_kpindex(date,verbose=verbose,station=station,real_time=real_time)
         
-        if self.verbose:
+        if verbose:
             print("Magnetic-Index fueron actualizados.")
 
         return 
@@ -2079,7 +2091,7 @@ class geomagixs (object):
                                      b0,b1,b2,b3,b4,b5,b6,b7,a_median_data[i])
                 file.write(chain+'\n')
             
-        if self.verbose:
+        if verbose:
             print("Guardanod {}".os.path.basename(fpath))
 
 
@@ -2167,7 +2179,7 @@ class geomagixs (object):
         tmp = numpy.where(exist_data_file==True)[0]
         capable_to_make = len(tmp)
 
-        if capable_to_make != file_number and self.verbose:
+        if capable_to_make != file_number and verbose:
             print("Warning: Valores invalidos, reemplazando valores conflictivos con datos genericos. Archivos de tipo GMS_YYYYMMDD.delta_H{}.".format(extention))
 
         dH_data = numpy.empty(file_number*25,dtype=float)
@@ -2253,18 +2265,23 @@ class geomagixs (object):
         return 
     
     def __magneticindex_monthlyfile(self,initial=None,final=None,**kwargs):
+        #--------------------------------- Parameters -----------------------------------#
+
         station = kwargs.get("station",None)
         verbose = kwargs.get("verbose",False)
         force_all = kwargs.get("force_all",False)
         real_time = kwargs.get("real_time",False)
+
+        #--------------------------------------------------------------------------------#
         # @geomagixs_commons
         # geomagixs_setup_commons, /QUIET
         # geomagixs_check_system, /QUIET
         # geomagixs_setup_dates, STATION=station, /QUIET, /FORCE_ALL
 
         # geomagixs_check_gms, STATION=station, /QUIET
+
         if initial is not None and final is not None:
-            check_dates(initial,final,gms=self.GMS,verbose=verbose,system=self.system)
+            check_dates(self,initial,final,gms=self.GMS,verbose=verbose,system=self.system)
         if initial is None:
             initial=self.system['today_date']
         if final is None:
@@ -2319,7 +2336,7 @@ class geomagixs (object):
         capable_to_update = len(exist_monthly_file)
         files_to_update = len(numpy.where(exist_monthly_file != True)[0])
 
-        if self.verbose or force_all is True:
+        if verbose or force_all is True:
 
             if files_to_update > 0 :
                 print("Un total de {} archivo(s) necesitan ser actualizados.")
@@ -4454,8 +4471,8 @@ class geomagixs (object):
                 
                 date_final = date_initial 
                 
-            #falta definir al parecer
-            self.__check_dates(date_initial,date_final,station,verbose)
+       
+            check_dates(self,date_initial,date_final,station,verbose)
             
             # [YYYY, MM, DD] , initial date and time at which th
             if (self.GMS[self.system['gms']]['name'] == 'planetary'):
@@ -4635,18 +4652,18 @@ class geomagixs (object):
 
 
                     files_source_name_k [i] = 'kp{:02d}{:02d}'.format(tmp_y%1000,tmp_m)
-                    directories_source_name[i]  = 'ftp://ftp.gfz-potsdam.de/pub/home/obs/kp-ap/wdc/'
+                    directories_source_name[i]  = 'ftp://ftp.gfz-potsdam.de/pub/home/obs/kp-ap/wdc'
 
 
                     if JULDAY(datetime(date_initial.year,date_final.month,1)+relativedelta(months=i)) == JULDAY(datetime(self.system['today_date'].year,\
                                                                                                                          self.system['today_date'].month,1)):
                         
-                        directories_source_name[i]= 'http://www-app3.gfz-potsdam.de/kp_index/'
+                        directories_source_name[i]= 'http://www-app3.gfz-potsdam.de/kp_index'
                         files_source_name_k[i]      = 'qlyymm.wdc' 
                     
                     if JULDAY(datetime(date_initial.year,date_final.month,1)+relativedelta(months=i+1)) ==JULDAY(datetime(self.system['today_date'].year,\
                                                                                                                          self.system['today_date'].month,1)):
-                        directories_source_name[i]  = 'http://www-app3.gfz-potsdam.de/kp_index/'
+                        directories_source_name[i]  = 'http://www-app3.gfz-potsdam.de/kp_index'
                         files_source_name_k[i]      = 'pqlyymm.wdc'
                     
                     directories_destiny_name[i] = os.path.join(self.system['datasource_dir'],self.GMS[''])
@@ -4950,14 +4967,14 @@ class geomagixs (object):
                 
                 aux_lenght = len(buff[cabecera])
                 
-                aux_00 = numpy.sum(numpy.array(list(map(len,tmp_data[cabecera:]))))
+                aux_00 = numpy.sum(numpy.array(list(map(len,buff[cabecera:]))))
                 aux_01 = (nlines - cabecera)*aux_lenght
                 aux_02 = (nlines - cabecera)*62
                 
                 
                 if aux_00 != aux_01:
                     buff_len   = list(map(len,buff[cabecera:]))
-                    bad_indexes = [x != aux_length for x in buff_len]
+                    bad_indexes = [x != aux_lenght for x in buff_len]
                     bad_lines = numpy.array(buff,dtype='object')[bad_indexes]
                     
                     if verbose is True and force_all is False:
@@ -4973,21 +4990,19 @@ class geomagixs (object):
                 #read 
                 
                 
-                #falta revisar el archivo que se intenta descargar
-                #linea 189-194
-                #falta 
-                #falta  
+        
                 
-                if len(buff[cabecera])==62:
-                    
+                if len(buff[cabecera])>1:
+                
                     read_format = r"\b\d+(?:\.\d+)?\b"
-                
+               
                 
                 data_read = list()
                 
                 for lines in good_lines:
                     
                     temp = re.findall(read_format,lines)
+
                     if len(temp)>0:
                         
                         tmp_dict = deepcopy(data)
@@ -5143,7 +5158,7 @@ class geomagixs (object):
                 else:    
                     files_source_name_k [i] = 'qd{:04d}{:02d}.txt'.format(tmp_year,tmp_decade+9)
 
-                directories_source_name[i]  = 'ftp://ftp.gfz-potsdam.de/pub/home/obs/kp-ap/quietdst/'
+                directories_source_name[i]  = 'ftp://ftp.gfz-potsdam.de/pub/home/obs/kp-ap/quietdst'
                 directories_destiny_name[i] = self.system['qdays_dir']
                 
                 
