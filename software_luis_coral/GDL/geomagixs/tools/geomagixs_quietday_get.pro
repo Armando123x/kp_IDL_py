@@ -685,12 +685,12 @@ FUNCTION getting_statistic_quietday, initial, STATION=station, $
                         ;qday[clean_indexes].dF = !VALUES.F_NAN ;999999.00
         ;ENDIF
         ;FOR i = 0, N_ELEMENTS(qday[*].dH)-1 DO print, qday[i].D, qday[i].H, qday[i].Z, qday[i].F, FORMAT='(F,F,F,F)'
-
-        ;plot, qday[*].H , MAX_VALUE=999990., YRANGE=[27340.,27380.]
-        ;oplot, qday[*].H+0.1*qday[*].dH
-        ;plot, qday[*].dH , MAX_VALUE=999990., /Ylog;, YRANGE=[27370.,27400.]
+/Ylog;, YRANGE=[27370.,27400.]
         ;FOR i=0, N_ELEMENTS(qday[*].dH)-1 DO PRINT, i, median(qday[*].dH), qday[i].dH
         tmp_arr = fft(qday[*].H,1)
+        ;plot, qday[*].H , MAX_VALUE=999990., YRANGE=[27340.,27380.]
+        ;oplot, qday[*].H+0.1*qday[*].dH
+        ;plot, qday[*].dH , MAX_VALUE=999990., 
         tmp_arr_median = median(ABS(tmp_arr[*]))
 ;###############################################################################
 ;###############################################################################
@@ -1461,37 +1461,7 @@ FUNCTION geomagixs_quietday_get, initial, STATION=station, $
                         qday = getting_quietday ([tmp_year, tmp_month, tmp_day], STATION=station, QUIET=quiet, REAL_TIME=real_time, LOCAL=local) $
                         ELSE qday = getting_statistic_quietday ([tmp_year, tmp_month, tmp_day], STATION=station, QUIET=quiet, REAL_TIME=real_time, LOCAL=local) $
                 
-                ;CALDAT, JULDAY(initial_tmp[1]-2,1,initial_tmp[0]), tmp_month, tmp_day, tmp_year
-                ;qday0   = getting_quietday([tmp_year, tmp_month,1], STATION=station, QUIET=quiet, REAL_TIME=real_time, LOCAL=local)
-                ;N_days0 = JULDAY(initial_tmp[1]-1,0,initial_tmp[0]) - JULDAY(initial_tmp[1]-2,0,initial_tmp[0])
-
-                ;CALDAT, JULDAY(initial[1]-1,1,initial[0]), tmp_month, tmp_day, tmp_year
-                ;qday    = getting_quietday([tmp_year, tmp_month, tmp_day], STATION=station, QUIET=quiet, REAL_TIME=real_time, LOCAL=local)
-                ;qday1   = getting_quietday([tmp_year, tmp_month, tmp_day], STATION=station, QUIET=quiet, REAL_TIME=real_time, LOCAL=local)
-                ;N_days1 = JULDAY(initial_tmp[1],0,initial_tmp[0]) - JULDAY(initial_tmp[1]-1,0,initial_tmp[0])
-
-                ;N_days2 = JULDAY(initial_tmp[1],initial_tmp[2],initial_tmp[0]) - JULDAY(initial_tmp[1],0,initial_tmp[0])
-                ;delta_H = median(qday1[*].H-qday0[*].H)
-                ;delta_D = median(qday1[*].D-qday0[*].D)
-                ;delta_Z = median(qday1[*].Z-qday0[*].Z)
-                ;delta_F = median(qday1[*].F-qday0[*].F)
-                
-                ;julday_tmp = JULDAY(initial_tmp[1]-1,1,initial_tmp[0])
-                ;print, N_days0, N_days1, N_days2
-                
-                ;v       = [N_days0/2.,N_days0+N_days1/2.]
-                ;w       = [N_days0+N_days1+1.*N_days2]
-                
-                ;N_days3 = JULDAY(initial_tmp[1]+1,0,initial_tmp[0]) - JULDAY(initial_tmp[1],0,initial_tmp[0])
-                
-                ;qday[*].H += delta_H*((N_days1*0.5+N_days2)/(0.5*(N_days1+N_days3)))
-                ;qday[*].D += delta_D*((N_days1*0.5+N_days2)/(0.5*(N_days1+N_days3)))
-                ;qday[*].Z += delta_Z*((N_days1*0.5+N_days2)/(0.5*(N_days1+N_days3)))
-                ;qday[*].F += delta_F*((N_days1*0.5+N_days2)/(0.5*(N_days1+N_days3)))
-                
-                ;qday[*].year  = initial_tmp[0]
-                ;qday[*].month = initial_tmp[1]
-                
+  
                 ;        print, v, w
         ELSE BEGIN
                 CALDAT, JULDAY(initial_tmp[1],0,initial_tmp[0]), tmp_month, tmp_day, tmp_year
@@ -1513,6 +1483,7 @@ FUNCTION geomagixs_quietday_get, initial, STATION=station, $
                 
                 qday = qday1
                 FOR i=0, N_ELEMENTS(qday1[*].H)-1 DO BEGIN
+                #INTERPOL(y, x, xinterp)
                         DH      = interpol([qday0[i].H,qday1[i].H,qday2[i].H], v, w)
                         DD      = interpol([qday0[i].D,qday1[i].D,qday1[i].D], v, w)
                         DZ      = interpol([qday0[i].Z,qday1[i].Z,qday1[i].Z], v, w)
