@@ -1,0 +1,15 @@
+version: '3'
+services:
+  ftp_downloader:
+    build:
+      context: . 
+      dockerfile: Dockerfile  
+    enviroment:
+      - FTP_HOST = "http://lisn.igp.gob.pe/"
+      - FTP_PORT = 21
+      - FTP_USERNAME = acastro
+      - FTP_PASSWORD = UhmqBB0yLz4f5vLu1HvC
+      - FTP_DIRECTORY = 
+    
+    volumes:
+      - ./downloaded_files:/app/downloaed

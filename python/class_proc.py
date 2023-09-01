@@ -586,36 +586,38 @@ class geomagixs (object):
                           12.5, 14.8, 16.8, 19.1, 22.6, 25.6, 29.1,  
                           34.4, 39.1, 44.4, 52.5, 59.6, 67.7, 80.1,  
                           90.9,103.2,122.2,138.7,157.5,186.4,211.6]
-      
-        result = 0*(numpy.array((dH_tmp <= dH_table[1]),dtype=int)) +  \
-                    3*(numpy.array(dH_tmp > dH_table[1],dtype=bool)  & numpy.array(dH_tmp <= dH_table[2],dtype=bool)).astype(int) +  \
-                    7*(numpy.array(dH_tmp > dH_table[2],dtype=bool)  & numpy.array(dH_tmp <= dH_table[3],dtype=bool)).astype(int) +  \
-                    10*(numpy.array(dH_tmp > dH_table[3],dtype=bool)  & numpy.array(dH_tmp <= dH_table[4],dtype=bool)).astype(int) +  \
-                    13*(numpy.array(dH_tmp > dH_table[4],dtype=bool)  & numpy.array(dH_tmp <= dH_table[5],dtype=bool)).astype(int) + \
-                    17*(numpy.array(dH_tmp > dH_table[5],dtype=bool)  & numpy.array(dH_tmp <= dH_table[6],dtype=bool)).astype(int) +  \
-                    20*(numpy.array(dH_tmp > dH_table[6],dtype=bool)  & numpy.array(dH_tmp <= dH_table[7],dtype=bool)).astype(int) +  \
-                    23*(numpy.array(dH_tmp > dH_table[7],dtype=bool)  & numpy.array(dH_tmp <= dH_table[8],dtype=bool)).astype(int) +  \
-                    27*(numpy.array(dH_tmp > dH_table[8],dtype=bool)  & numpy.array(dH_tmp <= dH_table[9],dtype=bool)).astype(int) +  \
-                    30*(numpy.array(dH_tmp > dH_table[9],dtype=bool)  & numpy.array(dH_tmp <= dH_table[10],dtype=bool)).astype(int) +  \
-                    33*(numpy.array(dH_tmp > dH_table[10],dtype=bool)  & numpy.array(dH_tmp <= dH_table[11],dtype=bool)).astype(int) +  \
-                    37*(numpy.array(dH_tmp > dH_table[11],dtype=bool)  & numpy.array(dH_tmp <= dH_table[12],dtype=bool)).astype(int) +  \
-                    40*(numpy.array(dH_tmp > dH_table[12],dtype=bool)  & numpy.array(dH_tmp <= dH_table[13],dtype=bool)).astype(int) +  \
-                    43*(numpy.array(dH_tmp > dH_table[13],dtype=bool)  & numpy.array(dH_tmp <= dH_table[14],dtype=bool)).astype(int) +  \
-                    47*(numpy.array(dH_tmp > dH_table[14],dtype=bool)  & numpy.array(dH_tmp <= dH_table[15],dtype=bool)).astype(int) +  \
-                    50*(numpy.array(dH_tmp > dH_table[15],dtype=bool)  & numpy.array(dH_tmp <= dH_table[16],dtype=bool)).astype(int) +  \
-                    53*(numpy.array(dH_tmp > dH_table[16],dtype=bool)  & numpy.array(dH_tmp <= dH_table[17],dtype=bool)).astype(int) +  \
-                    57*(numpy.array(dH_tmp > dH_table[17],dtype=bool)  & numpy.array(dH_tmp <= dH_table[18],dtype=bool)).astype(int) +  \
-                    60*(numpy.array(dH_tmp > dH_table[18],dtype=bool)  & numpy.array(dH_tmp <= dH_table[19],dtype=bool)).astype(int) +  \
-                    63*(numpy.array(dH_tmp > dH_table[19],dtype=bool)  & numpy.array(dH_tmp <= dH_table[20],dtype=bool)).astype(int) +  \
-                    67*(numpy.array(dH_tmp > dH_table[20],dtype=bool)  & numpy.array(dH_tmp <= dH_table[21],dtype=bool)).astype(int) +  \
-                    70*(numpy.array(dH_tmp > dH_table[21],dtype=bool)  & numpy.array(dH_tmp <= dH_table[22],dtype=bool)).astype(int) +  \
-                    73*(numpy.array(dH_tmp > dH_table[22],dtype=bool)  & numpy.array(dH_tmp <= dH_table[23],dtype=bool)).astype(int) +  \
-                    77*(numpy.array(dH_tmp > dH_table[23],dtype=bool)  & numpy.array(dH_tmp <= dH_table[24],dtype=bool)).astype(int) +  \
-                    80*(numpy.array(dH_tmp > dH_table[24],dtype=bool)  & numpy.array(dH_tmp <= dH_table[25],dtype=bool)).astype(int) +  \
-                    83*(numpy.array(dH_tmp > dH_table[25],dtype=bool)  & numpy.array(dH_tmp <= dH_table[26],dtype=bool)).astype(int) +  \
-                    87*(numpy.array(dH_tmp > dH_table[26],dtype=bool)  & numpy.array(dH_tmp <= dH_table[27],dtype=bool)).astype(int) +  \
-                    90*(numpy.array(dH_tmp  > dH_table[27],dtype=bool)  & numpy.array(dH_tmp < MAX_dH,dtype=bool)).astype(int) +  \
-                    999*(numpy.array(dH_tmp >= MAX_dH,dtype=int))
+
+        dH_table = numpy.sort(dH_table)
+
+        result = 0*((numpy.array((dH_tmp <= dH_table[1]),dtype=bool)).astype(int)) +  \
+                    3*((numpy.array(dH_tmp > dH_table[1],dtype=bool)  & numpy.array(dH_tmp <= dH_table[2],dtype=bool)).astype(int)) +  \
+                    7*((numpy.array(dH_tmp > dH_table[2],dtype=bool)  & numpy.array(dH_tmp <= dH_table[3],dtype=bool)).astype(int)) +  \
+                    10*((numpy.array(dH_tmp > dH_table[3],dtype=bool)  & numpy.array(dH_tmp <= dH_table[4],dtype=bool)).astype(int)) +  \
+                    13*((numpy.array(dH_tmp > dH_table[4],dtype=bool)  & numpy.array(dH_tmp <= dH_table[5],dtype=bool)).astype(int)) + \
+                    17*((numpy.array(dH_tmp > dH_table[5],dtype=bool)  & numpy.array(dH_tmp <= dH_table[6],dtype=bool)).astype(int)) +  \
+                    20*((numpy.array(dH_tmp > dH_table[6],dtype=bool)  & numpy.array(dH_tmp <= dH_table[7],dtype=bool)).astype(int)) +  \
+                    23*((numpy.array(dH_tmp > dH_table[7],dtype=bool)  & numpy.array(dH_tmp <= dH_table[8],dtype=bool)).astype(int)) +  \
+                    27*((numpy.array(dH_tmp > dH_table[8],dtype=bool)  & numpy.array(dH_tmp <= dH_table[9],dtype=bool)).astype(int)) +  \
+                    30*((numpy.array(dH_tmp > dH_table[9],dtype=bool)  & numpy.array(dH_tmp <= dH_table[10],dtype=bool)).astype(int)) +  \
+                    33*((numpy.array(dH_tmp > dH_table[10],dtype=bool)  & numpy.array(dH_tmp <= dH_table[11],dtype=bool)).astype(int)) +  \
+                    37*((numpy.array(dH_tmp > dH_table[11],dtype=bool)  & numpy.array(dH_tmp <= dH_table[12],dtype=bool)).astype(int)) +  \
+                    40*((numpy.array(dH_tmp > dH_table[12],dtype=bool)  & numpy.array(dH_tmp <= dH_table[13],dtype=bool)).astype(int)) +  \
+                    43*((numpy.array(dH_tmp > dH_table[13],dtype=bool)  & numpy.array(dH_tmp <= dH_table[14],dtype=bool)).astype(int)) +  \
+                    47*((numpy.array(dH_tmp > dH_table[14],dtype=bool)  & numpy.array(dH_tmp <= dH_table[15],dtype=bool)).astype(int)) +  \
+                    50*((numpy.array(dH_tmp > dH_table[15],dtype=bool)  & numpy.array(dH_tmp <= dH_table[16],dtype=bool)).astype(int)) +  \
+                    53*((numpy.array(dH_tmp > dH_table[16],dtype=bool)  & numpy.array(dH_tmp <= dH_table[17],dtype=bool)).astype(int)) +  \
+                    57*((numpy.array(dH_tmp > dH_table[17],dtype=bool)  & numpy.array(dH_tmp <= dH_table[18],dtype=bool)).astype(int)) +  \
+                    60*((numpy.array(dH_tmp > dH_table[18],dtype=bool)  & numpy.array(dH_tmp <= dH_table[19],dtype=bool)).astype(int)) +  \
+                    63*((numpy.array(dH_tmp > dH_table[19],dtype=bool)  & numpy.array(dH_tmp <= dH_table[20],dtype=bool)).astype(int)) +  \
+                    67*((numpy.array(dH_tmp > dH_table[20],dtype=bool)  & numpy.array(dH_tmp <= dH_table[21],dtype=bool)).astype(int)) +  \
+                    70*((numpy.array(dH_tmp > dH_table[21],dtype=bool)  & numpy.array(dH_tmp <= dH_table[22],dtype=bool)).astype(int)) +  \
+                    73*((numpy.array(dH_tmp > dH_table[22],dtype=bool)  & numpy.array(dH_tmp <= dH_table[23],dtype=bool)).astype(int)) +  \
+                    77*((numpy.array(dH_tmp > dH_table[23],dtype=bool)  & numpy.array(dH_tmp <= dH_table[24],dtype=bool)).astype(int)) +  \
+                    80*((numpy.array(dH_tmp > dH_table[24],dtype=bool)  & numpy.array(dH_tmp <= dH_table[25],dtype=bool)).astype(int)) +  \
+                    83*((numpy.array(dH_tmp > dH_table[25],dtype=bool)  & numpy.array(dH_tmp <= dH_table[26],dtype=bool)).astype(int)) +  \
+                    87*((numpy.array(dH_tmp > dH_table[26],dtype=bool)  & numpy.array(dH_tmp <= dH_table[27],dtype=bool)).astype(int)) +  \
+                    90*((numpy.array(dH_tmp  > dH_table[27],dtype=bool)  & numpy.array(dH_tmp < MAX_dH,dtype=bool)).astype(int)) +  \
+                    999*((numpy.array(dH_tmp >= MAX_dH,dtype=bool).astype(int)))
         
  
         return result
@@ -676,7 +678,7 @@ class geomagixs (object):
 
         calibration = self.__ReadCalibration_MAGIND()
 
-
+        
         data = self.__getting_deltab(date,verbose=verbose,real_time=real_time)
 
         K_mex = self.__dH2Kp(data['delta_H'],calibration['dH_table'])
@@ -1746,7 +1748,7 @@ class geomagixs (object):
                 fpath = os.path.join(self.system['datasource_dir'],self.GMS[self.system['gms']]['name'],file_name)
 
 
-                with open(fpath,'w') as file:
+                with open(fpath,'r') as file:
                     tmp_data = file.read().splitlines() 
                 
                     tmp_data = numpy.array(tmp_data,dtype='object')
@@ -1761,7 +1763,7 @@ class geomagixs (object):
             fpath = os.path.join(self.system['datasource_dir'],self.GMS[self.system['gms']]['name'],file_name)
 
             
-            with open(fpath,'w') as file:
+            with open(fpath,'r') as file:
                 tmp_data = file.read().splitlines() 
             
                 tmp_data = numpy.array(tmp_data,dtype='object')
@@ -2007,6 +2009,7 @@ class geomagixs (object):
             result  = CALDAT(JULDAY(datetime(initial_tmp.year,initial_tmp.month,1)+relativedelta(days=-1)))
  
             tmp_month,tmp_year,tmp_day = result.month,result.year,result.day
+
             qday0 = self.__getting_quietday(datetime(tmp_year,tmp_month,1),station=station,verbose=verbose, local=local)
             N_days0 = JULDAY(datetime(initial_tmp.year,initial_tmp.month,1)+relativedelta(days=-1)) - \
                       JULDAY(datetime(initial_tmp.year,initial_tmp.month,1)+relativedelta(days=-1)+relativedelta(months=-1))
@@ -2024,10 +2027,12 @@ class geomagixs (object):
                       JULDAY(datetime(initial_tmp.year,initial_tmp.month,1)+relativedelta(months=+1)+relativedelta(days=-1))
 
 
-            N_days = JULDAY(initial_tmp)-JULDAY(datetime(initial_tmp.year,initial_tmp.month,initial_tmp.day)+relativedelta(days=-1))
+            N_days = JULDAY(initial_tmp)-JULDAY(datetime(initial_tmp.year,
+                                                         initial_tmp.month,
+                                                         1)+relativedelta(days=-1))
 
-            v = numpy.array([N_days0//2,N_days0+N_days1//2,N_days0+N_days1+N_days2//2])
-            w = numpy.array([N_days+1*N_days])
+            v = numpy.array([N_days0//2,    N_days0+N_days1//2, N_days0+N_days1+N_days2//2])
+            w = numpy.array([N_days0+1*N_days])
 
             qday  = deepcopy(qday1)
             #INTERPOL( V, X, XOUT )
@@ -2038,13 +2043,13 @@ class geomagixs (object):
                 DD = numpy.interp(w,v,[numpy.median(qday0[i]['D']),numpy.median(qday1[i]['D']),numpy.median(qday2[i]['D'])])           
                 DZ = numpy.interp(w,v,[numpy.median(qday0[i]['Z']),numpy.median(qday1[i]['Z']),numpy.median(qday2[i]['Z'])])           
                 DF = numpy.interp(w,v,[numpy.median(qday0[i]['F']),numpy.median(qday1[i]['F']),numpy.median(qday2[i]['F'])])           
-                
+         
                 qday[i]['H'] = DH
                 qday[i]['D'] = DD
                 qday[i]['Z'] = DZ
                 qday[i]['F'] = DF
 
-                qday[i]['day']  = initial_tmp.year
+                qday[i]['day']  = initial_tmp.day
 
 
         return qday   
@@ -2826,8 +2831,6 @@ class geomagixs (object):
         
         
         
-        
-    
             initial_year = initial.year
             initial_month = initial.month
             initial_day = initial.day
@@ -2876,6 +2879,7 @@ class geomagixs (object):
                 string_date[n] = tmp
                 kmex_file_name[n] = '{}_{}.clean.dat'.format(self.GMS[self.system['gms']]['code'],string_date[n])
 
+
             fpath = [os.path.join(self.system['processed_dir'],self.GMS[self.system['gms']]['name'],path) for path in kmex_file_name]
             fpath = numpy.array(fpath,dtype=object)
 
@@ -2905,7 +2909,10 @@ class geomagixs (object):
                     F_values[i] = deepcopy(vectorize(tmp_data,'F'))
 
                 else:
-                    print("Archivo {} no existe.".format(os.path.basename(fpath[i])))
+                    if verbose:
+                        print("Archivo {} no existe.".format(os.path.basename(fpath[i])))
+
+
                     tmp_data = self.__getting_magneticdata(CALDAT(tmp_julday),station=station,verbose=verbose)
 
                     # D_values[i] = deepcopy(vectorize(tmp_data,'D'))
@@ -3446,6 +3453,7 @@ class geomagixs (object):
         data_file_list = numpy.empty(standar_day_list[0]['quiet_day'].shape[0],dtype='object')
 
         for i in range(standar_day_list[0]['quiet_day'].shape[0]):
+            
             date = datetime(tmp_year,tmp_month,1) + relativedelta(days=-1)+ relativedelta(days=int(standar_day_list[0]['quiet_day'][i]) )
             tmp = self.__getting_magneticdata(initial=date,station=station,verbose=verbose)
             
@@ -4138,7 +4146,7 @@ class geomagixs (object):
         for i,element in enumerate(make_update_file):
 
             if make_update_file [i] ==True:
-                print("string_date",string_date)
+ 
                 tmp_year = string_date[i][:4]
                 tmp_month = string_date[i][4:6]
                 tmp_day = string_date[i][6:]
@@ -4148,7 +4156,7 @@ class geomagixs (object):
                 tmp_day = int(tmp_day)
 
                 date = datetime(tmp_year,tmp_month,tmp_day)
-                print("dateee",date)
+           
 
                 if station != 'planetary' : 
                     self.__making_processeddatafiles(date,verbose=verbose,station=station,real_time=real_time,statistic_qd=statistic_qd)
@@ -4162,7 +4170,11 @@ class geomagixs (object):
 
     def __making_processeddatafiles(self,initial,**kwargs):
         
- 
+            '''
+            Script geomagixs 
+            geomagixs_magneticdata_process.pro
+            
+            '''
             
             station = kwargs.get("station",None)
             verbose = kwargs.get("verbose",False)
@@ -4236,7 +4248,7 @@ class geomagixs (object):
 
                 if exist:
                      
-                    magnetic_data_tmp = self.__getting_magneticdata(initial,station=station,verbose=verbose)
+                    magnetic_data_tmp = self.__getting_magneticdata(result,station=station,verbose=verbose)
           
                     '''
                         struct = {'year':0,'month':0,'day':0,'hour':0,'sec':0,
@@ -4334,7 +4346,7 @@ class geomagixs (object):
             mask3 = numpy.abs(vectorize(total_magnetic_data[minutes_per_day*(N_days-1):minutes_per_day*(N_days)],'D')) < 9990
             mask3 = mask3.astype('bool')
 
-            mask = mask1 & mask2 & mask  & mask3 & mask0
+            mask = mask1 & mask2 & mask  & mask3
 
 
             valid_minutes = numpy.where(mask)[0]
@@ -4376,7 +4388,7 @@ class geomagixs (object):
                                 total_tendency[valid_days] = deepcopy(fit.tendency)
                                 
                                 
-                                for n,indx in enumerate(valid_days) : 
+                                for _,indx in enumerate(valid_days) : 
                                     
                                     total_magnetic_data[indx][key] -= total_tendency[indx]
  
@@ -4384,6 +4396,7 @@ class geomagixs (object):
                                 for indx in valid_minutes:
                                     magnetic_data[indx][key] = total_magnetic_data[minutes_per_day*(N_days-1) + indx][key] + total_tendency [minutes_per_day*(  N_days-1) + indx]
                                     if key == 'D': 
+                                        print("qdaydaya",qday_data.shape,valid_minutes.shape)
                                         D_median[indx] = qday_data[indx][key] - numpy.median(vectorize(qday_data[valid_minutes],key) ) + total_tendency [minutes_per_day*(N_days-1) + indx]
                                       
                                     if key == 'H': 

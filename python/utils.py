@@ -4,6 +4,7 @@ import subprocess
 import re
 import numpy  
 from scipy.signal import convolve
+from scipy.ndimage import uniform_filter1d
 from datetime import datetime
 import numbers 
 import glob
@@ -20,11 +21,16 @@ array_to_lower = numpy.vectorize(lambda x: x.lower())
 
 
 
-def smooth(data, window_size):
-    window = numpy.ones(window_size) / window_size
-    smoothed_data = convolve(data, window, mode='same')
-    return smoothed_data
+def smooth(data, window_size,type='filter'):
 
+    if (type =='convolve'):
+        window = numpy.ones(window_size) / window_size
+        smoothed_data = convolve(data, window, mode='same')
+    
+    elif (type=='filter'):
+        smoothed_data = uniform_filter(data, window_size, mode='constant', origin=-(window_size//2))
+    
+    return smoothed_data
 
 
 def verifyisnumber(var):
@@ -45,7 +51,7 @@ def check_dates (self,initial=None, final=None, **kwargs):
 
     if gms is None:
         raise AttributeError ("El método check_dates necesita el parámetro gms.")
-    try:
+ 
 
         if initial is None:
             if final is None:
@@ -93,8 +99,7 @@ def check_dates (self,initial=None, final=None, **kwargs):
         return     
                 
                     
-    except:
-        print("Ocurrió un error ")
+    
 
 
 def fill(array,struct):
@@ -221,14 +226,17 @@ def FILE_LINES(lista):
 
 
 def check_directory(path_dir,verbose= False,type_='r'):
-
-    value,action = os.R_OK,'leer' if type=='r' else os.W_OK,'escribir'
     
+    value,action = (os.R_OK,'leer') if type=='r' else (os.W_OK,'escribir')
+
+    
+    path_dir = os.path.expanduser(path_dir)
+
     if not os.path.exists(path_dir):
         if verbose:
             print("Directorio {} no existe. Se creará con el directorio vacio.".format(path_dir))
 
-        os.makedirs(os.path.dirname(path_dir))
+        os.makedirs((path_dir))
     
     if not (path_dir,value) :
         if verbose is True:
@@ -284,17 +292,17 @@ def POLY_FIT (x,y,n=2):
             self.status_result = None
 
 
-
-    result = numpy.polyfit(x,y,n)
-    tendency = numpy.polyval(result,x)
+    #coeff or result
+    coeff = numpy.polyfit(x,y,n)
+    tendency = numpy.polyval(coeff,x)
     delta = numpy.std(tendency-y)
 
-    status_result  =numpy.isnan(result).any()
+    status_result  =numpy.isnan(coeff).any()
 
 
     payload = obj()
 
-    payload.result = result
+    payload.result = coeff
     payload.tendency = tendency
     payload.delta = delta
     payload.status_result = status_result
